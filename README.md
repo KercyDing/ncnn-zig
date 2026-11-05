@@ -31,13 +31,30 @@ The package also exports a Zig module named `ncnn`:
 exe.root_module.addImport("ncnn", ncnn_dep.module("ncnn"));
 ```
 
-The module holds C API bindings generated with
-[translate-c](https://codeberg.org/ziglang/translate-c). It links the library
-for you.
+The module is a Zig wrapper over the C API. It links the library for you.
 
-- Covers `c_api.h` only.
-- C-style names and nullable pointers.
-- No hand-written wrapper yet.
+```zig
+const ncnn = @import("ncnn");
+
+var net = try ncnn.Net.init();
+defer net.deinit();
+try net.loadParamFile("model.param");
+try net.loadModelFile("model.bin");
+
+var extractor = try net.createExtractor();
+defer extractor.deinit();
+
+var input = try ncnn.Mat.fromSlice3d(224, 224, 3, pixels);
+defer input.deinit();
+try extractor.input("data", input);
+
+var output = try extractor.extract("prob");
+defer output.deinit();
+```
+
+The raw C API, generated with
+[translate-c](https://codeberg.org/ziglang/translate-c), stays available as
+`ncnn.c`.
 
 Headers (`platform.h`, `c_api.h`, `layer/…`) are installed with the library.
 
@@ -84,7 +101,7 @@ const ncnn_dep = b.dependency("ncnn", .{
 
 ```bash
 zig build               # compile the library
-zig build bindings      # generate and type-check the Zig bindings
+zig build bindings      # generate and type-check the wrapper
 zig build test          # C API smoke test: Input -> ReLU through the bindings
 zig build test-upstream # upstream layer tests (kernels vs naive reference)
 ```
