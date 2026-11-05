@@ -87,6 +87,15 @@ as `-D<name>`.
 | `winxp` | `false` | Windows XP compatibility |
 | `disable_rtti`, `disable_exception` | `false` | build without RTTI/exceptions |
 | `runtime_cpu` | `true` | x86 AVX/AVX512 dispatch |
+| `x86_isa` | `all` | x86 subset: `all`, `off`, or comma-separated ISAs (see below) |
+| `arm_isa` | `all` | aarch64 subset: `all`, `off`, or comma-separated ISAs (see below) |
+
+`x86_isa` accepts `avx`, `avx2`, `fma`, `fma4`, `xop`, `f16c`, `avxvnni`,
+`avxvnniint8`, `avxneconvert`, `avx512`, `avx512vnni`, `avx512bf16`.
+`arm_isa` accepts `asimdhp`, `asimddp`, `asimdfhm`, `bf16`, `i8mm`
+(`vfpv4` is always built on aarch64). Selecting a subset skips the other
+variant sources at build time, which shrinks the binary; ncnn still dispatches
+between the selected ones at runtime.
 
 ```zig
 const ncnn_dep = b.dependency("ncnn", .{
@@ -94,8 +103,13 @@ const ncnn_dep = b.dependency("ncnn", .{
     .optimize = optimize,
     .linkage = .dynamic,
     .pixel = false,
+    .x86_isa = "avx,avx2,avx512",
+    .arm_isa = "asimdhp,asimddp,asimdfhm,bf16,i8mm",
 });
 ```
+
+The same values are accepted on the command line, e.g.
+`zig build -Dx86_isa=avx,avx2`.
 
 ## Status
 

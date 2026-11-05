@@ -21,15 +21,29 @@ pub fn build(b: *std.Build) !void {
     const t = target.result;
 
     const arch = archDirName(t.cpu.arch);
-    const runtime_x86 = if (arch) |a| std.mem.eql(u8, a, "x86") and options.runtime_cpu and t.abi != .msvc else false;
+    const is_x86 = if (arch) |a| std.mem.eql(u8, a, "x86") else false;
+    const x86_dispatch = is_x86 and options.runtime_cpu and t.abi != .msvc;
+    const x86_isa = x86: {
+        if (!is_x86) break :x86 std.EnumSet(config.X86Isa).empty;
+        if (!x86_dispatch) {
+            if (!std.mem.eql(u8, options.x86_isa, "all") and !std.mem.eql(u8, options.x86_isa, "off"))
+                fail("x86_isa requires runtime_cpu=true and a non-MSVC ABI", .{});
+            break :x86 std.EnumSet(config.X86Isa).empty;
+        }
+        const set = parseIsaOrExit(config.X86Isa, options.x86_isa, "x86_isa", x86_isa_names);
+        validateX86Isa(set);
+        break :x86 set;
+    };
     const arm32 = switch (t.cpu.arch) {
         .arm, .armeb, .thumb, .thumbeb => true,
         else => false,
     };
     const arm64 = t.cpu.arch.isAarch64();
-    // aarch64 always builds the per-ISA variants and dispatches at runtime;
-    // `runtime_cpu` only controls the x86 AVX/AVX512 variants.
-    const runtime_arm = arm64;
+    const arm_isa = if (arm64)
+        parseIsaOrExit(config.ArmIsa, options.arm_isa, "arm_isa", arm_isa_names)
+    else
+        std.EnumSet(config.ArmIsa).empty;
+    if (arm64) validateArmIsa(arm_isa, options.bf16);
     // simpleomp uses pthread_once, so it is POSIX only.
     const openmp = options.openmp and t.os.tag != .windows;
     // LLVM cannot emit SEH unwind info for the GNU asm blocks in the arm
@@ -76,10 +90,9 @@ pub fn build(b: *std.Build) !void {
         options,
         sources.version.string,
         sources.version.number,
-        runtime_x86,
+        x86_isa,
         is_arm,
-        arm64,
-        runtime_arm,
+        arm_isa,
         openmp,
         gnu_inline_asm,
     ));
@@ -94,7 +107,7 @@ pub fn build(b: *std.Build) !void {
     var avx512_sources: std.ArrayList([]const u8) = .empty;
     defer avx512_sources.deinit(b.allocator);
 
-    if (runtime_x86) {
+    if (x86_isa.count() != 0) {
         for (layers) |*layer| {
             if (!layer.enabled) continue;
             const a = layer.arch orelse continue;
@@ -112,22 +125,27 @@ pub fn build(b: *std.Build) !void {
             const base_cpp = try readUpstream(b, upstream, cpp_rel);
             defer b.allocator.free(base_cpp);
 
-            inline for (.{ "avx", "avx512" }) |isa| {
-                const header = try makeVariant(b.allocator, base_h, layer.name, lower, isa);
-                defer b.allocator.free(header);
-                const source = try makeVariant(b.allocator, base_cpp, layer.name, lower, isa);
-                defer b.allocator.free(source);
+            inline for (.{
+                .{ .name = "avx", .tag = config.X86Isa.avx },
+                .{ .name = "avx512", .tag = config.X86Isa.avx512 },
+            }) |isa| {
+                if (x86_isa.contains(isa.tag)) {
+                    const header = try makeVariant(b.allocator, base_h, layer.name, lower, isa.name);
+                    defer b.allocator.free(header);
+                    const source = try makeVariant(b.allocator, base_cpp, layer.name, lower, isa.name);
+                    defer b.allocator.free(source);
 
-                _ = generated.add(b.fmt("layer/x86/{s}_x86_{s}.h", .{ lower, isa }), header);
-                const source_path = b.fmt("layer/x86/{s}_x86_{s}.cpp", .{ lower, isa });
-                _ = generated.add(source_path, source);
+                    _ = generated.add(b.fmt("layer/x86/{s}_x86_{s}.h", .{ lower, isa.name }), header);
+                    const source_path = b.fmt("layer/x86/{s}_x86_{s}.cpp", .{ lower, isa.name });
+                    _ = generated.add(source_path, source);
 
-                if (comptime std.mem.eql(u8, isa, "avx")) {
-                    layer.avx = true;
-                    try avx_sources.append(b.allocator, source_path);
-                } else {
-                    layer.avx512 = true;
-                    try avx512_sources.append(b.allocator, source_path);
+                    if (comptime std.mem.eql(u8, isa.name, "avx")) {
+                        layer.avx = true;
+                        try avx_sources.append(b.allocator, source_path);
+                    } else {
+                        layer.avx512 = true;
+                        try avx512_sources.append(b.allocator, source_path);
+                    }
                 }
             }
         }
@@ -146,7 +164,8 @@ pub fn build(b: *std.Build) !void {
     mod.addIncludePath(src_dir);
     if (arch) |a| mod.addIncludePath(src_dir.path(b, b.fmt("layer/{s}", .{a})));
     mod.addIncludePath(src_dir.path(b, "layer"));
-    if (runtime_x86) mod.addIncludePath(generated.getDirectory().path(b, "layer/x86"));
+    if (x86_isa.contains(.avx) or x86_isa.contains(.avx512))
+        mod.addIncludePath(generated.getDirectory().path(b, "layer/x86"));
 
     var flags: std.ArrayList([]const u8) = .empty;
     defer flags.deinit(b.allocator);
@@ -212,38 +231,51 @@ pub fn build(b: *std.Build) !void {
         .flags = flags.items,
     });
 
-    if (runtime_x86) {
-        const avx_flags = try flagsWithFeatures(b.allocator, flags.items, &avx_features);
-        mod.addCSourceFiles(.{
-            .root = generated.getDirectory(),
-            .files = avx_sources.items,
-            .flags = avx_flags,
-        });
+    if (x86_isa.count() != 0) {
+        if (avx_sources.items.len != 0) {
+            const avx_flags = try flagsWithFeatures(b.allocator, flags.items, &avx_features);
+            mod.addCSourceFiles(.{
+                .root = generated.getDirectory(),
+                .files = avx_sources.items,
+                .flags = avx_flags,
+            });
+        }
 
-        const avx512_flags = try flagsWithFeatures(b.allocator, flags.items, &avx512_features);
-        mod.addCSourceFiles(.{
-            .root = generated.getDirectory(),
-            .files = avx512_sources.items,
-            .flags = avx512_flags,
-        });
+        if (avx512_sources.items.len != 0) {
+            const avx512_flags = try flagsWithFeatures(b.allocator, flags.items, &avx512_features);
+            mod.addCSourceFiles(.{
+                .root = generated.getDirectory(),
+                .files = avx512_sources.items,
+                .flags = avx512_flags,
+            });
+        }
 
         // Checked-in per-layer kernels that feed the base classes, e.g.
         // `convolution_x86_avx2.cpp`.
-        const isa_sources = [_]struct { name: []const u8, features: []const []const u8 }{
-            .{ .name = "fma", .features = &fma_features },
-            .{ .name = "fma4", .features = &fma4_features },
-            .{ .name = "xop", .features = &xop_features },
-            .{ .name = "avxvnni", .features = &avxvnni_features },
-            .{ .name = "avxvnniint8", .features = &avxvnniint8_features },
-            .{ .name = "avxneconvert", .features = &avxneconvert_features },
-            .{ .name = "f16c", .features = &f16c_features },
-            .{ .name = "avx2", .features = &avx2_features },
-            .{ .name = "avx512vnni", .features = &avx512vnni_features },
-            .{ .name = "avx512bf16", .features = &avx512bf16_features },
-            .{ .name = "avx512vnni_avx512bf16", .features = &avx512vnni_avx512bf16_features },
+        const isa_sources = [_]struct {
+            name: []const u8,
+            features: []const []const u8,
+            enabled: bool,
+        }{
+            .{ .name = "fma", .features = &fma_features, .enabled = x86_isa.contains(.fma) },
+            .{ .name = "fma4", .features = &fma4_features, .enabled = x86_isa.contains(.fma4) },
+            .{ .name = "xop", .features = &xop_features, .enabled = x86_isa.contains(.xop) },
+            .{ .name = "avxvnni", .features = &avxvnni_features, .enabled = x86_isa.contains(.avxvnni) },
+            .{ .name = "avxvnniint8", .features = &avxvnniint8_features, .enabled = x86_isa.contains(.avxvnniint8) },
+            .{ .name = "avxneconvert", .features = &avxneconvert_features, .enabled = x86_isa.contains(.avxneconvert) },
+            .{ .name = "f16c", .features = &f16c_features, .enabled = x86_isa.contains(.f16c) },
+            .{ .name = "avx2", .features = &avx2_features, .enabled = x86_isa.contains(.avx2) },
+            .{ .name = "avx512vnni", .features = &avx512vnni_features, .enabled = x86_isa.contains(.avx512vnni) },
+            .{ .name = "avx512bf16", .features = &avx512bf16_features, .enabled = x86_isa.contains(.avx512bf16) },
+            .{
+                .name = "avx512vnni_avx512bf16",
+                .features = &avx512vnni_avx512bf16_features,
+                .enabled = x86_isa.contains(.avx512vnni) and x86_isa.contains(.avx512bf16),
+            },
         };
 
         for (isa_sources) |isa| {
+            if (!isa.enabled) continue;
             var group: std.ArrayList([]const u8) = .empty;
             defer group.deinit(b.allocator);
 
@@ -279,20 +311,19 @@ pub fn build(b: *std.Build) !void {
         defer arm_isas.deinit(b.allocator);
 
         if (arm64) {
-            // ARM82 and VFPv4 kernels are compiled regardless of runtime
-            // dispatch, matching the upstream options.
-            try arm_isas.appendSlice(b.allocator, &.{
-                .{ .name = "vfpv4", .features = &arm_baseline_features },
-                .{ .name = "asimdhp", .features = &arm_fp16_features },
-            });
-            if (runtime_arm) {
-                try arm_isas.appendSlice(b.allocator, &.{
-                    .{ .name = "asimddp", .features = &arm_dotprod_features },
-                    .{ .name = "asimdfhm", .features = &arm_fp16fml_features },
-                    .{ .name = "bf16", .features = &arm_bf16_features },
-                    .{ .name = "i8mm", .features = &arm_i8mm_features },
-                });
-            }
+            // vfpv4 provides the fp16s fallback helpers and is always built;
+            // the other ISAs are dispatched at runtime and user-selectable.
+            try arm_isas.append(b.allocator, .{ .name = "vfpv4", .features = &arm_baseline_features });
+            if (arm_isa.contains(.asimdhp))
+                try arm_isas.append(b.allocator, .{ .name = "asimdhp", .features = &arm_fp16_features });
+            if (arm_isa.contains(.asimddp))
+                try arm_isas.append(b.allocator, .{ .name = "asimddp", .features = &arm_dotprod_features });
+            if (arm_isa.contains(.asimdfhm))
+                try arm_isas.append(b.allocator, .{ .name = "asimdfhm", .features = &arm_fp16fml_features });
+            if (arm_isa.contains(.bf16))
+                try arm_isas.append(b.allocator, .{ .name = "bf16", .features = &arm_bf16_features });
+            if (arm_isa.contains(.i8mm))
+                try arm_isas.append(b.allocator, .{ .name = "i8mm", .features = &arm_i8mm_features });
         } else {
             try arm_isas.append(b.allocator, .{ .name = "vfpv4", .features = &arm_vfpv4_features });
         }
@@ -607,6 +638,41 @@ fn baselineTarget(b: *std.Build, target: std.Build.ResolvedTarget) std.Build.Res
     query.cpu_features_add = .empty;
     query.cpu_features_sub = .empty;
     return b.resolveTargetQuery(query);
+}
+
+const x86_isa_names = "avx, avx2, fma, fma4, xop, f16c, avxvnni, avxvnniint8, avxneconvert, avx512, avx512vnni, avx512bf16";
+const arm_isa_names = "asimdhp, asimddp, asimdfhm, bf16, i8mm";
+
+fn fail(comptime fmt: []const u8, args: anytype) noreturn {
+    std.log.err(fmt, args);
+    std.process.exit(1);
+}
+
+fn parseIsaOrExit(comptime E: type, spec: []const u8, label: []const u8, names: []const u8) std.EnumSet(E) {
+    return config.parseIsaSet(E, spec) catch
+        fail("{s} must be 'all', 'off', or a comma-separated subset of: {s}", .{ label, names });
+}
+
+fn validateX86Isa(set: std.EnumSet(config.X86Isa)) void {
+    if ((set.contains(.fma) or set.contains(.fma4) or set.contains(.xop) or
+        set.contains(.f16c) or set.contains(.avx2)) and !set.contains(.avx))
+        fail("x86_isa: fma/fma4/xop/f16c/avx2 require avx", .{});
+    if ((set.contains(.avxvnni) or set.contains(.avxvnniint8) or set.contains(.avxneconvert) or
+        set.contains(.avx512)) and !set.contains(.avx2))
+        fail("x86_isa: avxvnni/avxvnniint8/avxneconvert/avx512 require avx2", .{});
+    if ((set.contains(.avx512vnni) or set.contains(.avx512bf16)) and !set.contains(.avx512))
+        fail("x86_isa: avx512vnni/avx512bf16 require avx512", .{});
+}
+
+fn validateArmIsa(set: std.EnumSet(config.ArmIsa), bf16_feature: bool) void {
+    if ((set.contains(.asimddp) or set.contains(.asimdfhm) or set.contains(.bf16) or set.contains(.i8mm)) and
+        !set.contains(.asimdhp))
+        fail("arm_isa: asimddp/asimdfhm/bf16/i8mm require asimdhp", .{});
+    if ((set.contains(.bf16) or set.contains(.i8mm)) and
+        !(set.contains(.asimddp) and set.contains(.asimdfhm)))
+        fail("arm_isa: bf16/i8mm require asimddp and asimdfhm", .{});
+    if (bf16_feature and !set.contains(.bf16))
+        fail("arm_isa must include bf16 while bf16 is enabled; pass -Dbf16=false to drop bf16 support", .{});
 }
 
 comptime {

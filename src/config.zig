@@ -2,6 +2,48 @@
 
 const std = @import("std");
 
+/// x86 runtime-dispatch ISAs that have upstream variant sources.
+pub const X86Isa = enum {
+    avx,
+    avx2,
+    fma,
+    fma4,
+    xop,
+    f16c,
+    avxvnni,
+    avxvnniint8,
+    avxneconvert,
+    avx512,
+    avx512vnni,
+    avx512bf16,
+};
+
+/// aarch64 runtime-dispatch ISAs that have upstream variant sources.
+/// The vfpv4 baseline kernels are always built and are not selectable.
+pub const ArmIsa = enum {
+    asimdhp,
+    asimddp,
+    asimdfhm,
+    bf16,
+    i8mm,
+};
+
+pub fn parseIsaSet(comptime E: type, spec: []const u8) error{InvalidIsa}!std.EnumSet(E) {
+    const trimmed = std.mem.trim(u8, spec, " \t");
+    if (std.mem.eql(u8, trimmed, "all")) return std.EnumSet(E).full;
+    if (trimmed.len == 0 or std.mem.eql(u8, trimmed, "off")) return std.EnumSet(E).empty;
+
+    var set: std.EnumSet(E) = .empty;
+    var it = std.mem.splitScalar(u8, trimmed, ',');
+    while (it.next()) |raw| {
+        const name = std.mem.trim(u8, raw, " \t");
+        if (name.len == 0) return error.InvalidIsa;
+        const tag = std.meta.stringToEnum(E, name) orelse return error.InvalidIsa;
+        set.insert(tag);
+    }
+    return set;
+}
+
 pub const Options = struct {
     linkage: std.builtin.LinkMode = .static,
 
@@ -39,6 +81,11 @@ pub const Options = struct {
     /// Runtime CPU dispatch for x86 (AVX/AVX2/AVX512 variants).
     runtime_cpu: bool = true,
 
+    /// x86 dispatch subset: `all`, `off`, or comma-separated `X86Isa` names.
+    x86_isa: []const u8 = "all",
+    /// aarch64 dispatch subset: `all`, `off`, or comma-separated `ArmIsa` names.
+    arm_isa: []const u8 = "all",
+
     gnu_inline_asm: bool = true,
 
     disable_rtti: bool = false,
@@ -55,6 +102,8 @@ pub const Options = struct {
         }) |name| {
             @field(o, name) = b.option(bool, name, "ncnn " ++ name) orelse @field(o, name);
         }
+        o.x86_isa = b.option([]const u8, "x86_isa", "x86 dispatch subset: all, off, or comma-separated ISAs") orelse o.x86_isa;
+        o.arm_isa = b.option([]const u8, "arm_isa", "arm64 dispatch subset: all, off, or comma-separated ISAs") orelse o.arm_isa;
         return o;
     }
 };
@@ -130,10 +179,9 @@ pub fn platformValues(
     o: Options,
     version_string: []const u8,
     version_number: i64,
-    runtime_x86: bool,
-    vfpv4: bool,
-    arm82: bool,
-    runtime_arm: bool,
+    x86_isa: std.EnumSet(X86Isa),
+    is_arm: bool,
+    arm_isa: std.EnumSet(ArmIsa),
     openmp: bool,
     gnu_inline_asm: bool,
 ) PlatformValues {
@@ -159,30 +207,30 @@ pub fn platformValues(
         .NCNN_COVERAGE = o.coverage,
         .NCNN_SIMPLEVK = o.simplevk,
         .NCNN_SYSTEM_GLSLANG = o.system_glslang,
-        .NCNN_RUNTIME_CPU = runtime_x86 or runtime_arm,
+        .NCNN_RUNTIME_CPU = x86_isa.count() != 0 or arm_isa.count() != 0,
         .NCNN_GNU_INLINE_ASM = gnu_inline_asm,
         // x86 runtime dispatch: base code calls the dispatched variants.
         // AVX512-FP16 and AVXVNNI-INT16 have no upstream sources and stay off.
-        .NCNN_AVX = runtime_x86,
-        .NCNN_XOP = runtime_x86,
-        .NCNN_FMA = runtime_x86,
-        .NCNN_FMA4 = runtime_x86,
-        .NCNN_F16C = runtime_x86,
-        .NCNN_AVX2 = runtime_x86,
-        .NCNN_AVXVNNI = runtime_x86,
-        .NCNN_AVXVNNIINT8 = runtime_x86,
+        .NCNN_AVX = x86_isa.contains(.avx),
+        .NCNN_XOP = x86_isa.contains(.xop),
+        .NCNN_FMA = x86_isa.contains(.fma),
+        .NCNN_FMA4 = x86_isa.contains(.fma4),
+        .NCNN_F16C = x86_isa.contains(.f16c),
+        .NCNN_AVX2 = x86_isa.contains(.avx2),
+        .NCNN_AVXVNNI = x86_isa.contains(.avxvnni),
+        .NCNN_AVXVNNIINT8 = x86_isa.contains(.avxvnniint8),
         .NCNN_AVXVNNIINT16 = false,
-        .NCNN_AVXNECONVERT = runtime_x86,
-        .NCNN_AVX512 = runtime_x86,
-        .NCNN_AVX512VNNI = runtime_x86,
-        .NCNN_AVX512BF16 = runtime_x86,
+        .NCNN_AVXNECONVERT = x86_isa.contains(.avxneconvert),
+        .NCNN_AVX512 = x86_isa.contains(.avx512),
+        .NCNN_AVX512VNNI = x86_isa.contains(.avx512vnni),
+        .NCNN_AVX512BF16 = x86_isa.contains(.avx512bf16),
         .NCNN_AVX512FP16 = false,
-        .NCNN_VFPV4 = vfpv4,
-        .NCNN_ARM82 = arm82,
-        .NCNN_ARM82DOT = runtime_arm,
-        .NCNN_ARM82FP16FML = runtime_arm,
-        .NCNN_ARM84BF16 = runtime_arm,
-        .NCNN_ARM84I8MM = runtime_arm,
+        .NCNN_VFPV4 = is_arm,
+        .NCNN_ARM82 = arm_isa.contains(.asimdhp),
+        .NCNN_ARM82DOT = arm_isa.contains(.asimddp),
+        .NCNN_ARM82FP16FML = arm_isa.contains(.asimdfhm),
+        .NCNN_ARM84BF16 = arm_isa.contains(.bf16),
+        .NCNN_ARM84I8MM = arm_isa.contains(.i8mm),
         .NCNN_ARM86SVE = false,
         .NCNN_ARM86SVE2 = false,
         .NCNN_ARM86SVEBF16 = false,
