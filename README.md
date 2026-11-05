@@ -86,7 +86,7 @@ as `-D<name>`.
 | `simpleocv`, `simplestl`, `simplemath` | `false` | minimal stubs |
 | `winxp` | `false` | Windows XP compatibility |
 | `disable_rtti`, `disable_exception` | `false` | build without RTTI/exceptions |
-| `runtime_cpu` | `true` | x86 AVX/AVX512 dispatch |
+| `runtime_cpu` | `true` | x86 AVX/AVX512 dispatch (x86 only) |
 | `x86_isa` | `all` | x86 subset: `all`, `off`, or comma-separated ISAs (see below) |
 | `arm_isa` | `all` | aarch64 subset: `all`, `off`, or comma-separated ISAs (see below) |
 
@@ -97,6 +97,11 @@ as `-D<name>`.
 variant sources at build time, which shrinks the binary; ncnn still dispatches
 between the selected ones at runtime.
 
+`runtime_cpu` only controls x86; on aarch64 use `arm_isa` instead
+(`-Darm_isa=off` disables dispatch). The `bf16` storage feature defaults to
+`true`, so an aarch64 subset must include `bf16` unless `.bf16 = false` is set
+— including `arm_isa = "off"`.
+
 ```zig
 const ncnn_dep = b.dependency("ncnn", .{
     .target = target,
@@ -104,7 +109,7 @@ const ncnn_dep = b.dependency("ncnn", .{
     .linkage = .dynamic,
     .pixel = false,
     .x86_isa = "avx,avx2,avx512",
-    .arm_isa = "asimdhp,asimddp,asimdfhm,bf16,i8mm",
+    .arm_isa = "asimdhp,asimddp,asimdfhm,bf16",
 });
 ```
 

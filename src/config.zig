@@ -78,7 +78,8 @@ pub const Options = struct {
     simplevk: bool = true,
     system_glslang: bool = false,
 
-    /// Runtime CPU dispatch for x86 (AVX/AVX2/AVX512 variants).
+    /// Runtime CPU dispatch for x86 (AVX/AVX2/AVX512 variants). aarch64
+    /// dispatch is controlled by `arm_isa`.
     runtime_cpu: bool = true,
 
     /// x86 dispatch subset: `all`, `off`, or comma-separated `X86Isa` names.

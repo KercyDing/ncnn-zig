@@ -20,6 +20,36 @@ jobs:
       - name: Check formatting
         run: zig fmt --check build.zig src test examples/relu/build.zig examples/relu/src
 
+  dispatch:
+    name: Dispatch subsets
+    needs: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.1
+
+      - name: Baseline only
+        run: zig build test -Dx86_isa=off
+
+      - name: AVX2 subset
+        run: zig build test-upstream -Dx86_isa=avx,avx2
+
+      - name: AArch64 subset
+        run: zig build bindings -Dtarget=aarch64-linux-gnu -Darm_isa=asimdhp,asimddp -Dbf16=false
+
+      - name: Reject invalid subsets
+        shell: bash
+        run: |
+          ! zig build bindings -Dx86_isa=avx2
+          ! zig build bindings -Dx86_isa=all,avx2
+          ! zig build bindings -Dtarget=aarch64-linux-gnu -Darm_isa=asimddp
+          ! zig build bindings -Dtarget=aarch64-linux-gnu -Druntime_cpu=false
+
   test:
     name: Build and test (${{ matrix.platform }})
     needs: fmt

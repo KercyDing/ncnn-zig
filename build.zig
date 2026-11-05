@@ -39,6 +39,8 @@ pub fn build(b: *std.Build) !void {
         else => false,
     };
     const arm64 = t.cpu.arch.isAarch64();
+    if (arm64 and !options.runtime_cpu and !std.mem.eql(u8, options.arm_isa, "off"))
+        fail("runtime_cpu is x86-only; pass -Darm_isa=off to disable aarch64 dispatch", .{});
     const arm_isa = if (arm64)
         parseIsaOrExit(config.ArmIsa, options.arm_isa, "arm_isa", arm_isa_names)
     else
