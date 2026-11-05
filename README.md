@@ -37,8 +37,8 @@ The package also exports a Zig module named `ncnn`:
 exe.root_module.addImport("ncnn", ncnn_dep.module("ncnn"));
 ```
 
-The module wraps the common surface (`Net`, `Extractor`, `Mat`, `Option`) and
-links the library for you.
+The module wraps `Net`, `Extractor`, `Mat`, `Option` and `ParamDict`, plus
+pixel conversion and drawing helpers. It links the library for you.
 
 ```zig
 const ncnn = @import("ncnn");
@@ -101,10 +101,10 @@ const ncnn_dep = b.dependency("ncnn", .{
 - This matches how upstream compiles its base sources.
 - Optimized `src/layer/x86` and `src/layer/arm` kernels are included when they
   exist.
-- x86 runtime dispatch is built: AVX, FMA, F16C, AVX2, AVX512, AVX512VNNI and
-  AVX512BF16 variants are generated from the upstream sources and picked by
-  ncnn's CPU check.
-- Not built: arm dispatch variants, XOP/FMA4, AVX-VNNI, AVX512-FP16, Vulkan,
+- x86 runtime dispatch is built: AVX, FMA, F16C, AVX2, AVX512, AVX512VNNI,
+  AVX512BF16, FMA4, XOP, AVX-VNNI, AVX-VNNI-INT8 and AVX-NE-CONVERT variants
+  are generated from the upstream sources and picked by ncnn's CPU check.
+- Not built: arm dispatch variants, AVX512-FP16, AVX-VNNI-INT16, Vulkan,
   OpenMP. `vulkan` is rejected at configure time.
 - Threading uses ncnn's built-in thread pool.
 
@@ -112,8 +112,8 @@ Verified:
 
 - `zig build` on Linux, plus compile-only cross builds for
   `x86_64-windows-gnu` and `aarch64-macos`.
-- `zig build test`: version match, option round trip, `Input -> ReLU`
-  inference, Mat channel layout.
+- `zig build test`: version match, options, `Input -> ReLU`, Mat layout and
+  reshape, ParamDict round trip, pixel round trip, drawing.
 - `zig build test-upstream`: six upstream layer tests against this library.
 
 Everything else in the wrapper is unverified.
