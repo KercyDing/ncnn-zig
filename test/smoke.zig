@@ -1,6 +1,9 @@
+//! End-to-end checks for the Zig wrapper.
+
 const std = @import("std");
 const ncnn = @import("ncnn");
 
+// Minimal Input -> ReLU network, no weights needed.
 const param =
     \\7767517
     \\2 2

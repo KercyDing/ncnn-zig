@@ -1,31 +1,37 @@
+//! Tensor wrapper around `ncnn::Mat`.
+
 const std = @import("std");
 const c = @import("ncnn_c");
 const Error = @import("errors.zig").Error;
 
 /// Owns an `ncnn::Mat` allocated through the C API.
 ///
-/// ncnn stores channel-aligned data: use `channelFloat` for tensors instead
-/// of assuming one flat contiguous buffer.
+/// Channels may carry alignment padding, so prefer `channelFloat` over
+/// assuming one contiguous buffer.
 pub const Mat = struct {
     handle: c.ncnn_mat_t,
 
+    /// 1D vector of `w` floats.
     pub fn create1d(w: usize) Error!Mat {
         return wrap(c.ncnn_mat_create_1d(try dim(w), null));
     }
 
+    /// 2D image of `w` x `h`.
     pub fn create2d(w: usize, h: usize) Error!Mat {
         return wrap(c.ncnn_mat_create_2d(try dim(w), try dim(h), null));
     }
 
+    /// 3D tensor of `w` x `h` x channels.
     pub fn create3d(w: usize, h: usize, channel_count: usize) Error!Mat {
         return wrap(c.ncnn_mat_create_3d(try dim(w), try dim(h), try dim(channel_count), null));
     }
 
+    /// 4D tensor of `w` x `h` x d x channels.
     pub fn create4d(w: usize, h: usize, d: usize, channel_count: usize) Error!Mat {
         return wrap(c.ncnn_mat_create_4d(try dim(w), try dim(h), try dim(d), try dim(channel_count), null));
     }
 
-    /// Allocates a 1D float tensor and copies `data` into it.
+    /// Allocates a 1D float tensor and copies `data`.
     pub fn fromSlice1d(data: []const f32) Error!Mat {
         var mat = try create1d(data.len);
         errdefer mat.deinit();
@@ -33,7 +39,7 @@ pub const Mat = struct {
         return mat;
     }
 
-    /// Allocates a 2D float tensor and copies `data` (row-major, `w * h`).
+    /// Allocates a 2D float tensor and copies `data` (row-major).
     pub fn fromSlice2d(w: usize, h: usize, data: []const f32) Error!Mat {
         if (data.len != w * h) return Error.UnsupportedDims;
         var mat = try create2d(w, h);
@@ -42,7 +48,7 @@ pub const Mat = struct {
         return mat;
     }
 
-    /// Allocates a 3D float tensor and copies `data` (channel-major, `w * h * c`).
+    /// Allocates a 3D float tensor and copies `data` (channel-major).
     pub fn fromSlice3d(w: usize, h: usize, channel_count: usize, data: []const f32) Error!Mat {
         if (data.len != w * h * channel_count) return Error.UnsupportedDims;
         var mat = try create3d(w, h, channel_count);
@@ -51,65 +57,76 @@ pub const Mat = struct {
         return mat;
     }
 
+    /// Releases the underlying mat.
     pub fn deinit(self: *Mat) void {
         if (self.handle) |handle| c.ncnn_mat_destroy(handle);
         self.handle = null;
     }
 
+    /// Returns the underlying C handle.
     pub fn raw(self: Mat) c.ncnn_mat_t {
         return self.handle;
     }
 
+    /// Returns an independent copy.
     pub fn clone(self: Mat) Error!Mat {
         return wrap(c.ncnn_mat_clone(self.handle, null));
     }
 
+    /// 0 empty, 1 vector, 2 image, 3 dim, 4 batched dim.
     pub fn dims(self: Mat) usize {
         return @intCast(c.ncnn_mat_get_dims(self.handle));
     }
 
+    /// Vector width or image width.
     pub fn width(self: Mat) usize {
         return @intCast(c.ncnn_mat_get_w(self.handle));
     }
 
+    /// Image height.
     pub fn height(self: Mat) usize {
         return @intCast(c.ncnn_mat_get_h(self.handle));
     }
 
+    /// Depth of a 4D tensor.
     pub fn depth(self: Mat) usize {
         return @intCast(c.ncnn_mat_get_d(self.handle));
     }
 
+    /// Number of channels.
     pub fn channels(self: Mat) usize {
         return @intCast(c.ncnn_mat_get_c(self.handle));
     }
 
+    /// Batch count.
     pub fn batch(self: Mat) usize {
         return @intCast(c.ncnn_mat_get_n(self.handle));
     }
 
+    /// Bytes per packed element.
     pub fn elemsize(self: Mat) usize {
         return c.ncnn_mat_get_elemsize(self.handle);
     }
 
+    /// Floats per element: 1 for plain, 4/8/16 for packed layout.
     pub fn elempack(self: Mat) usize {
         return @intCast(c.ncnn_mat_get_elempack(self.handle));
     }
 
+    /// Channel stride in elements.
     pub fn cstep(self: Mat) usize {
         return c.ncnn_mat_get_cstep(self.handle);
     }
 
-    /// True when every element is a pack of plain `f32` values.
+    /// True when every element is a pack of plain f32 values.
     pub fn isFloat32(self: Mat) bool {
         const pack = self.elempack();
         return pack != 0 and self.elemsize() == pack * @sizeOf(f32);
     }
 
-    /// Returns one channel as a flat `f32` slice.
+    /// Returns one channel as a flat f32 slice.
     ///
-    /// The length is `width * height * depth * elempack`; padding between
-    /// channels is excluded.
+    /// Skips alignment padding between channels.
     pub fn channelFloat(self: Mat, index: usize) Error![]f32 {
         if (!self.isFloat32()) return Error.NotFloat32;
         if (index >= self.channels()) return Error.IndexOutOfBounds;
@@ -121,9 +138,9 @@ pub const Mat = struct {
         return ptr[0..len];
     }
 
-    /// Returns the whole tensor as a flat `f32` slice for 1D and 2D mats.
+    /// Returns the tensor as one flat f32 slice for 1D and 2D mats.
     ///
-    /// 3D and 4D mats may have channel padding, so use `channelFloat`.
+    /// 3D and 4D mats may have padded channels, use `channelFloat`.
     pub fn dataFloat(self: Mat) Error![]f32 {
         if (!self.isFloat32()) return Error.NotFloat32;
 
@@ -138,10 +155,12 @@ pub const Mat = struct {
         return ptr[0..len];
     }
 
+    /// Fills every element with `value`.
     pub fn fill(self: Mat, value: f32) void {
         c.ncnn_mat_fill_float(self.handle, value);
     }
 
+    /// Raw view used by the `fromSlice*` constructors.
     fn floatSpan(self: Mat, len: usize) []f32 {
         const data = c.ncnn_mat_get_data(self.handle) orelse unreachable;
         const ptr: [*]f32 = @ptrCast(@alignCast(data));
@@ -149,10 +168,12 @@ pub const Mat = struct {
     }
 };
 
+/// Rejects null handles early.
 fn wrap(handle: c.ncnn_mat_t) Error!Mat {
     return .{ .handle = handle orelse return Error.CreateMatFailed };
 }
 
+/// ncnn sizes are `int`.
 fn dim(value: usize) Error!c_int {
     return std.math.cast(c_int, value) orelse Error.OutOfMemory;
 }
