@@ -159,7 +159,7 @@ pub fn platformValues(
         .NCNN_COVERAGE = o.coverage,
         .NCNN_SIMPLEVK = o.simplevk,
         .NCNN_SYSTEM_GLSLANG = o.system_glslang,
-        .NCNN_RUNTIME_CPU = runtime_x86,
+        .NCNN_RUNTIME_CPU = runtime_x86 or runtime_arm,
         .NCNN_GNU_INLINE_ASM = gnu_inline_asm,
         // x86 runtime dispatch: base code calls the dispatched variants.
         // AVX512-FP16 and AVXVNNI-INT16 have no upstream sources and stay off.

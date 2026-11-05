@@ -26,7 +26,9 @@ pub fn build(b: *std.Build) !void {
         else => false,
     };
     const arm64 = t.cpu.arch.isAarch64();
-    const runtime_arm = arm64 and options.runtime_cpu;
+    // aarch64 always builds the per-ISA variants and dispatches at runtime;
+    // `runtime_cpu` only controls the x86 AVX/AVX512 variants.
+    const runtime_arm = arm64;
     // simpleomp uses pthread_once, so it is POSIX only.
     const openmp = options.openmp and t.os.tag != .windows;
     // LLVM cannot emit SEH unwind info for the GNU asm blocks in the arm
