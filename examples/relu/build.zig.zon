@@ -1,0 +1,14 @@
+.{
+    .name = .ncnn_example,
+    .version = "0.0.0",
+    .fingerprint = 0x5789423e77d95d0c,
+    .minimum_zig_version = "0.17.0",
+    .dependencies = .{
+        .ncnn = .{ .path = "../.." },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
