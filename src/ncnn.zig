@@ -13,6 +13,7 @@ pub const net = @import("net.zig");
 pub const paramdict = @import("paramdict.zig");
 pub const pixel = @import("pixel.zig");
 pub const draw = @import("draw.zig");
+pub const layer = @import("layer.zig");
 
 pub const Error = errors.Error;
 
@@ -30,6 +31,9 @@ pub const Extractor = net.Extractor;
 
 /// Layer parameter bag.
 pub const ParamDict = paramdict.ParamDict;
+
+/// Custom layer handle.
+pub const Layer = layer.Layer;
 
 /// Verifies the header version matches the linked runtime.
 pub const checkVersion = version.check;

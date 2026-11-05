@@ -5,6 +5,7 @@ const c = @import("ncnn_c");
 const Error = @import("errors.zig").Error;
 const Mat = @import("mat.zig").Mat;
 const Option = @import("option.zig").Option;
+const layer = @import("layer.zig");
 
 /// Owns an `ncnn::Net`.
 pub const Net = struct {
@@ -89,6 +90,30 @@ pub const Net = struct {
     pub fn outputName(self: Net, index: usize) ?[:0]const u8 {
         if (index >= self.outputCount()) return null;
         return cString(c.ncnn_net_get_output_name(self.handle, @intCast(index)));
+    }
+
+    /// Registers a custom layer factory by type name.
+    pub fn registerCustomLayerByType(
+        self: Net,
+        layer_type: []const u8,
+        creator: layer.Creator,
+        destroyer: layer.Destroyer,
+        userdata: ?*anyopaque,
+    ) Error!void {
+        var buf: [std.fs.max_path_bytes]u8 = undefined;
+        const type_z = try toPathZ(&buf, layer_type);
+        c.ncnn_net_register_custom_layer_by_type(self.handle, type_z.ptr, creator, destroyer, userdata);
+    }
+
+    /// Registers a custom layer factory by type index.
+    pub fn registerCustomLayerByTypeIndex(
+        self: Net,
+        typeindex: i32,
+        creator: layer.Creator,
+        destroyer: layer.Destroyer,
+        userdata: ?*anyopaque,
+    ) void {
+        c.ncnn_net_register_custom_layer_by_typeindex(self.handle, typeindex, creator, destroyer, userdata);
     }
 
     /// Creates an extractor; the net must outlive it.

@@ -14,6 +14,8 @@ pub const Error = error{
     CreateMatFailed,
     // ncnn_paramdict_create returned null.
     CreateParamDictFailed,
+    // ncnn_layer_create returned null.
+    CreateLayerFailed,
     // load_param returned non-zero.
     LoadParamFailed,
     // load_model returned non-zero.

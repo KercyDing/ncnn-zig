@@ -3,6 +3,7 @@
 const std = @import("std");
 const c = @import("ncnn_c");
 const Error = @import("errors.zig").Error;
+const Option = @import("option.zig").Option;
 
 /// Owns an `ncnn::Mat` allocated through the C API.
 ///
@@ -55,6 +56,58 @@ pub const Mat = struct {
         errdefer mat.deinit();
         @memcpy(mat.floatSpan(data.len), data);
         return mat;
+    }
+
+    /// Wraps caller-owned float memory, which must outlive this mat.
+    pub fn externalFloat1d(data: []f32) Error!Mat {
+        return wrap(c.ncnn_mat_create_external_1d(try dim(data.len), @ptrCast(data.ptr), null));
+    }
+
+    /// Wraps caller-owned row-major float memory, which must outlive this mat.
+    pub fn externalFloat2d(w: usize, h: usize, data: []f32) Error!Mat {
+        if (data.len != w * h) return Error.UnsupportedDims;
+        return wrap(c.ncnn_mat_create_external_2d(try dim(w), try dim(h), @ptrCast(data.ptr), null));
+    }
+
+    /// Wraps caller-owned float memory, which must outlive this mat.
+    pub fn externalFloat3d(w: usize, h: usize, channel_count: usize, data: []f32) Error!Mat {
+        if (data.len != w * h * channel_count) return Error.UnsupportedDims;
+        return wrap(c.ncnn_mat_create_external_3d(
+            try dim(w),
+            try dim(h),
+            try dim(channel_count),
+            @ptrCast(data.ptr),
+            null,
+        ));
+    }
+
+    /// Returns a repacked copy with `elempack` channels per element.
+    pub fn convertPacking(self: Mat, pack: usize) Error!Mat {
+        var option = try Option.init();
+        defer option.deinit();
+        return self.convertPackingWithOption(pack, option);
+    }
+
+    /// Returns a repacked copy using `option`.
+    pub fn convertPackingWithOption(self: Mat, pack: usize, option: Option) Error!Mat {
+        var dst: c.ncnn_mat_t = null;
+        const pack_c = std.math.cast(c_int, pack) orelse return Error.OutOfMemory;
+        c.ncnn_convert_packing(self.handle, &dst, pack_c, option.handle);
+        return wrap(dst);
+    }
+
+    /// Returns a 1D copy of the tensor data.
+    pub fn flatten(self: Mat) Error!Mat {
+        var option = try Option.init();
+        defer option.deinit();
+        return self.flattenWithOption(option);
+    }
+
+    /// Returns a 1D copy using `option`.
+    pub fn flattenWithOption(self: Mat, option: Option) Error!Mat {
+        var dst: c.ncnn_mat_t = null;
+        c.ncnn_flatten(self.handle, &dst, option.handle);
+        return wrap(dst);
     }
 
     /// Releases the underlying mat.

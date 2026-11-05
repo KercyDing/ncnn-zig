@@ -97,4 +97,76 @@ pub const Option = struct {
     pub fn useVulkanCompute(self: Option) bool {
         return c.ncnn_option_get_use_vulkan_compute(self.handle) != 0;
     }
+
+    /// Keeps packed blobs as fp16.
+    pub fn setUseFp16Packed(self: Option, enable: bool) void {
+        c.ncnn_option_set_use_fp16_packed(self.handle, @intFromBool(enable));
+    }
+
+    pub fn useFp16Packed(self: Option) bool {
+        return c.ncnn_option_get_use_fp16_packed(self.handle) != 0;
+    }
+
+    /// Computes in fp16 where the layer supports it.
+    pub fn setUseFp16Arithmetic(self: Option, enable: bool) void {
+        c.ncnn_option_set_use_fp16_arithmetic(self.handle, @intFromBool(enable));
+    }
+
+    pub fn useFp16Arithmetic(self: Option) bool {
+        return c.ncnn_option_get_use_fp16_arithmetic(self.handle) != 0;
+    }
+
+    /// Keeps packed blobs as bf16.
+    pub fn setUseBf16Packed(self: Option, enable: bool) void {
+        c.ncnn_option_set_use_bf16_packed(self.handle, @intFromBool(enable));
+    }
+
+    pub fn useBf16Packed(self: Option) bool {
+        return c.ncnn_option_get_use_bf16_packed(self.handle) != 0;
+    }
+
+    /// Keeps packed blobs as int8.
+    pub fn setUseInt8Packed(self: Option, enable: bool) void {
+        c.ncnn_option_set_use_int8_packed(self.handle, @intFromBool(enable));
+    }
+
+    pub fn useInt8Packed(self: Option) bool {
+        return c.ncnn_option_get_use_int8_packed(self.handle) != 0;
+    }
+
+    /// Stores intermediate blobs as int8.
+    pub fn setUseInt8Storage(self: Option, enable: bool) void {
+        c.ncnn_option_set_use_int8_storage(self.handle, @intFromBool(enable));
+    }
+
+    pub fn useInt8Storage(self: Option) bool {
+        return c.ncnn_option_get_use_int8_storage(self.handle) != 0;
+    }
+
+    /// Computes in int8 where the layer supports it.
+    pub fn setUseInt8Arithmetic(self: Option, enable: bool) void {
+        c.ncnn_option_set_use_int8_arithmetic(self.handle, @intFromBool(enable));
+    }
+
+    pub fn useInt8Arithmetic(self: Option) bool {
+        return c.ncnn_option_get_use_int8_arithmetic(self.handle) != 0;
+    }
+
+    /// Keeps packed blobs as int16.
+    pub fn setUseInt16Packed(self: Option, enable: bool) void {
+        c.ncnn_option_set_use_int16_packed(self.handle, @intFromBool(enable));
+    }
+
+    pub fn useInt16Packed(self: Option) bool {
+        return c.ncnn_option_get_use_int16_packed(self.handle) != 0;
+    }
+
+    /// Stores intermediate blobs as int16.
+    pub fn setUseInt16Storage(self: Option, enable: bool) void {
+        c.ncnn_option_set_use_int16_storage(self.handle, @intFromBool(enable));
+    }
+
+    pub fn useInt16Storage(self: Option) bool {
+        return c.ncnn_option_get_use_int16_storage(self.handle) != 0;
+    }
 };

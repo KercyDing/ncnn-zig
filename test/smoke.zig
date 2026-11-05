@@ -111,3 +111,101 @@ test "draw rectangle" {
         }
     }
 }
+
+test "option quantized switches" {
+    var opt = try ncnn.Option.init();
+    defer opt.deinit();
+
+    opt.setUseFp16Arithmetic(true);
+    try std.testing.expect(opt.useFp16Arithmetic());
+
+    opt.setUseInt8Storage(true);
+    try std.testing.expect(opt.useInt8Storage());
+
+    opt.setUseBf16Packed(true);
+    try std.testing.expect(opt.useBf16Packed());
+}
+
+test "external mat" {
+    var data = [_]f32{ 1, 2, 3 };
+    var mat = try ncnn.Mat.externalFloat1d(&data);
+    defer mat.deinit();
+
+    (try mat.dataFloat())[0] = 9;
+    try std.testing.expectEqual(@as(f32, 9), data[0]);
+}
+
+test "packing and flatten" {
+    const values = [_]f32{
+        1, 2,  3,  4,  5,  6,  7,  8,
+        9, 10, 11, 12, 13, 14, 15, 16,
+    };
+
+    var mat = try ncnn.Mat.fromSlice3d(2, 2, 4, &values);
+    defer mat.deinit();
+
+    var repacked = try mat.convertPacking(4);
+    defer repacked.deinit();
+    try std.testing.expectEqual(@as(usize, 4), repacked.elempack());
+    try std.testing.expectEqual(@as(usize, 1), repacked.channels());
+
+    var flat = try mat.flatten();
+    defer flat.deinit();
+    try std.testing.expectEqual(@as(usize, 1), flat.dims());
+    try std.testing.expectEqual(@as(usize, 16), (try flat.dataFloat()).len);
+}
+
+fn addHundredInplace(
+    handle: ncnn.c.ncnn_layer_t,
+    blob: ncnn.c.ncnn_mat_t,
+    opt: ncnn.c.ncnn_option_t,
+) callconv(.c) c_int {
+    _ = handle;
+    _ = opt;
+
+    const mat = ncnn.Mat{ .handle = blob };
+    const data = mat.dataFloat() catch return -1;
+    for (data) |*value| value.* += 100;
+    return 0;
+}
+
+fn createAddHundred(userdata: ?*anyopaque) callconv(.c) ncnn.c.ncnn_layer_t {
+    _ = userdata;
+
+    var layer = ncnn.Layer.init() catch return null;
+    layer.setOneBlobOnly(true);
+    layer.setSupportInplace(true);
+    layer.setForwardInplace1(addHundredInplace);
+    return layer.raw();
+}
+
+fn destroyAddHundred(handle: ncnn.c.ncnn_layer_t, userdata: ?*anyopaque) callconv(.c) void {
+    _ = userdata;
+    var layer = ncnn.Layer{ .handle = handle };
+    layer.deinit();
+}
+
+test "custom layer" {
+    var net = try ncnn.Net.init();
+    defer net.deinit();
+
+    try net.registerCustomLayerByType("AddHundred", createAddHundred, destroyAddHundred, null);
+    try net.loadParamMemory(
+        \\7767517
+        \\2 2
+        \\Input            input   0 1 data
+        \\AddHundred       add     1 1 data out
+    );
+
+    var extractor = try net.createExtractor();
+    defer extractor.deinit();
+
+    var input = try ncnn.Mat.fromSlice1d(&.{ 1, 2, 3 });
+    defer input.deinit();
+    try extractor.input("data", input);
+
+    var output = try extractor.extract("out");
+    defer output.deinit();
+
+    try std.testing.expectEqualSlices(f32, &.{ 101, 102, 103 }, try output.dataFloat());
+}
