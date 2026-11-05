@@ -1,11 +1,17 @@
 # ncnn.zig
 
-[ncnn](https://github.com/Tencent/ncnn) packaged for the Zig build system.
+Zig wrapper for [ncnn](https://github.com/Tencent/ncnn)'s standalone
+[C API](https://github.com/Tencent/ncnn/blob/master/src/c_api.h).
 
 - Builds from source. No CMake, no prebuilt binaries.
 - The upstream revision is pinned in `build.zig.zon`.
 - Upstream sources are not vendored here.
 - Requires Zig 0.17.
+
+> [!WARNING]
+> The Zig wrapper is AI-assisted and only partially verified. The shipped
+> build and tests pass, but most wrapper functions, options and quantized
+> paths have not been exercised. Treat it as experimental.
 
 ## Usage
 
@@ -31,7 +37,8 @@ The package also exports a Zig module named `ncnn`:
 exe.root_module.addImport("ncnn", ncnn_dep.module("ncnn"));
 ```
 
-The module is a Zig wrapper over the C API. It links the library for you.
+The module wraps the common surface (`Net`, `Extractor`, `Mat`, `Option`) and
+links the library for you.
 
 ```zig
 const ncnn = @import("ncnn");
@@ -97,12 +104,22 @@ const ncnn_dep = b.dependency("ncnn", .{
 - `runtime_cpu` and `vulkan` are rejected at configure time.
 - Threading uses ncnn's built-in thread pool.
 
+Verified:
+
+- `zig build` on Linux, plus compile-only cross builds for
+  `x86_64-windows-gnu` and `aarch64-macos`.
+- `zig build test`: version match, option round trip, `Input -> ReLU`
+  inference, Mat channel layout.
+- `zig build test-upstream`: six upstream layer tests against this library.
+
+Everything else in the wrapper is unverified.
+
 ## Development
 
 ```bash
 zig build               # compile the library
 zig build bindings      # generate and type-check the wrapper
-zig build test          # C API smoke test: Input -> ReLU through the bindings
+zig build test          # wrapper smoke test
 zig build test-upstream # upstream layer tests (kernels vs naive reference)
 ```
 
