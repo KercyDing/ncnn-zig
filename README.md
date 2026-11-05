@@ -1,0 +1,93 @@
+# ncnn.zig
+
+[ncnn](https://github.com/Tencent/ncnn) packaged for the Zig build system.
+
+- Builds from source. No CMake, no prebuilt binaries.
+- The upstream revision is pinned in `build.zig.zon`.
+- Upstream sources are not vendored here.
+- Requires Zig 0.17.
+
+## Usage
+
+Add the package:
+
+```bash
+zig fetch --save=ncnn git+https://github.com/kercyding/ncnn.zig
+```
+
+Link it from `build.zig`:
+
+```zig
+const ncnn_dep = b.dependency("ncnn", .{
+    .target = target,
+    .optimize = optimize,
+});
+exe.root_module.linkLibrary(ncnn_dep.artifact("ncnn"));
+```
+
+The package also exports a Zig module named `ncnn`:
+
+```zig
+exe.root_module.addImport("ncnn", ncnn_dep.module("ncnn"));
+```
+
+The module holds C API bindings generated with
+[translate-c](https://codeberg.org/ziglang/translate-c). It links the library
+for you.
+
+- Covers `c_api.h` only.
+- C-style names and nullable pointers.
+- No hand-written wrapper yet.
+
+Headers (`platform.h`, `c_api.h`, `layer/…`) are installed with the library.
+
+## Build options
+
+Options mirror the upstream CMake switches. Pass them to `b.dependency(...)` or
+as `-D<name>`.
+
+| Option | Default | |
+| --- | --- | --- |
+| `linkage` | `static` | `static` or `dynamic` |
+| `stdio`, `string`, `validation` | `true` | file loading, type names, param validation |
+| `threads` | `true` | thread pool |
+| `pixel`, `pixel_rotate`, `pixel_affine`, `pixel_drawing` | `true` | image helpers |
+| `batch` | `true` | batch inference |
+| `c_api`, `platform_api` | `true` | C API, platform helpers |
+| `int8`, `weight_quant`, `bf16` | `true` | quantized paths |
+| `force_inline` | `true` | force-inline hot helpers |
+| `benchmark`, `coverage` | `false` | upstream debug switches |
+| `simpleocv`, `simpleomp`, `simplestl`, `simplemath` | `false` | minimal stubs |
+| `winxp` | `false` | Windows XP compatibility |
+| `disable_rtti`, `disable_exception` | `false` | build without RTTI/exceptions |
+
+```zig
+const ncnn_dep = b.dependency("ncnn", .{
+    .target = target,
+    .optimize = optimize,
+    .linkage = .dynamic,
+    .pixel = false,
+});
+```
+
+## Status
+
+- Built for the architecture baseline: `x86_64`/`i386` + SSE2, `aarch64` NEON.
+- This matches how upstream compiles its base sources.
+- Optimized `src/layer/x86` and `src/layer/arm` kernels are included when they
+  exist.
+- Not implemented: per-ISA variants, runtime CPU dispatch, Vulkan, OpenMP.
+- `runtime_cpu` and `vulkan` are rejected at configure time.
+- Threading uses ncnn's built-in thread pool.
+
+## Development
+
+```bash
+zig build               # compile the library
+zig build bindings      # generate and type-check the Zig bindings
+zig build test          # C API smoke test: Input -> ReLU through the bindings
+zig build test-upstream # upstream layer tests (kernels vs naive reference)
+```
+
+ncnn's C++ is built with `sanitize_c = .off`. Upstream relies on type punning
+and pointer arithmetic that UBSan rejects.
