@@ -1,0 +1,16 @@
+pub const Error = error{
+    OutOfMemory,
+    CreateNetFailed,
+    CreateExtractorFailed,
+    CreateOptionFailed,
+    CreateMatFailed,
+    LoadParamFailed,
+    LoadModelFailed,
+    InputFailed,
+    ExtractFailed,
+    PathTooLong,
+    NotFloat32,
+    UnsupportedDims,
+    IndexOutOfBounds,
+    VersionMismatch,
+};

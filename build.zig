@@ -166,21 +166,32 @@ pub fn build(b: *std.Build) !void {
     if (options.linkage == .static) bindings.defineCMacro("NCNN_STATIC_DEFINE", null);
     bindings.linkLibrary(lib);
 
-    const ncnn_module = b.addModule("ncnn", .{
+    const ncnn_c = b.addModule("ncnn_c", .{
         .root_source_file = bindings.output_file,
         .target = target,
         .optimize = optimize,
         .link_libc = true,
     });
-    ncnn_module.addImport("c_builtins", translate_c.module("c_builtins"));
-    ncnn_module.addImport("helpers", translate_c.module("helpers"));
-    ncnn_module.linkLibrary(lib);
+    ncnn_c.addImport("c_builtins", translate_c.module("c_builtins"));
+    ncnn_c.addImport("helpers", translate_c.module("helpers"));
+    ncnn_c.linkLibrary(lib);
 
-    const bindings_step = b.step("bindings", "Generate and type-check Zig bindings for the ncnn C API");
+    const ncnn = b.addModule("ncnn", .{
+        .root_source_file = b.path("src/ncnn.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+        .imports = &.{
+            .{ .name = "ncnn_c", .module = ncnn_c },
+        },
+    });
+    ncnn.linkLibrary(lib);
+
+    const bindings_step = b.step("bindings", "Generate and type-check the Zig wrapper and its C bindings");
     bindings_step.dependOn(&bindings.run.step);
     bindings_step.dependOn(&b.addObject(.{
         .name = "ncnn_bindings",
-        .root_module = ncnn_module,
+        .root_module = ncnn,
     }).step);
 
     const test_step = b.step("test", "Run smoke tests");
@@ -191,7 +202,7 @@ pub fn build(b: *std.Build) !void {
         .link_libc = true,
         .link_libcpp = true,
     });
-    test_mod.addImport("ncnn", ncnn_module);
+    test_mod.addImport("ncnn", ncnn);
 
     const tests = b.addTest(.{ .root_module = test_mod });
     const run_tests = b.addRunArtifact(tests);

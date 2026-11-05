@@ -1,8 +1,3 @@
-//! End-to-end check through the translate-c bindings of ncnn's C API: load a
-//! parametrised network into memory, run inference and inspect the result.
-//! This exercises the layer registry, the generated headers, the translated
-//! bindings and the C++ runtime in one shot.
-
 const std = @import("std");
 const ncnn = @import("ncnn");
 
@@ -11,41 +6,54 @@ const param =
     \\2 2
     \\Input            input   0 1 data
     \\ReLU             relu    1 1 data out
-    \\
 ;
 
-test "version is reported" {
-    try std.testing.expect(ncnn.ncnn_version()[0] != 0);
+test "version matches headers" {
+    try ncnn.checkVersion();
+    try std.testing.expect(ncnn.version.string().len > 0);
+}
+
+test "option round trips" {
+    var opt = try ncnn.Option.init();
+    defer opt.deinit();
+
+    opt.setNumThreads(2);
+    try std.testing.expectEqual(@as(i32, 2), opt.numThreads());
+
+    opt.setUsePackingLayout(false);
+    try std.testing.expect(!opt.usePackingLayout());
 }
 
 test "relu inference" {
-    const net = ncnn.ncnn_net_create() orelse return error.OutOfMemory;
-    defer ncnn.ncnn_net_destroy(net);
+    var net = try ncnn.Net.init();
+    defer net.deinit();
 
-    try std.testing.expectEqual(@as(c_int, 0), ncnn.ncnn_net_load_param_memory(net, param));
+    try net.loadParamMemory(param);
+    try std.testing.expectEqual(@as(usize, 1), net.inputCount());
+    try std.testing.expectEqualStrings("data", net.inputName(0).?);
 
-    const ex = ncnn.ncnn_extractor_create(net) orelse return error.OutOfMemory;
-    defer ncnn.ncnn_extractor_destroy(ex);
+    var extractor = try net.createExtractor();
+    defer extractor.deinit();
 
-    const input_data = [_]f32{ -1, 2, -3, 4 };
-    const input = ncnn.ncnn_mat_create_1d(@intCast(input_data.len), null) orelse return error.OutOfMemory;
-    defer ncnn.ncnn_mat_destroy(input);
+    var input = try ncnn.Mat.fromSlice1d(&.{ -1, 2, -3, 4 });
+    defer input.deinit();
+    try extractor.input("data", input);
 
-    const input_ptr: [*]f32 = @ptrCast(@alignCast(ncnn.ncnn_mat_get_data(input).?));
-    @memcpy(input_ptr[0..input_data.len], &input_data);
+    var output = try extractor.extract("out");
+    defer output.deinit();
 
-    try std.testing.expectEqual(@as(c_int, 0), ncnn.ncnn_extractor_input_index(ex, 0, input));
+    try std.testing.expectEqual(@as(usize, 4), output.width());
+    const values = try output.dataFloat();
+    try std.testing.expectEqualSlices(f32, &.{ 0, 2, 0, 4 }, values);
+}
 
-    var out: ncnn.ncnn_mat_t = null;
-    try std.testing.expectEqual(@as(c_int, 0), ncnn.ncnn_extractor_extract_index(ex, 1, &out));
-    const output = out orelse return error.ExtractFailed;
-    defer ncnn.ncnn_mat_destroy(output);
+test "mat channels" {
+    var mat = try ncnn.Mat.fromSlice3d(2, 2, 2, &.{ 1, 2, 3, 4, 5, 6, 7, 8 });
+    defer mat.deinit();
 
-    try std.testing.expectEqual(@as(c_int, 4), ncnn.ncnn_mat_get_w(output));
-
-    const result: [*]const f32 = @ptrCast(@alignCast(ncnn.ncnn_mat_get_data(output).?));
-    const expected = [_]f32{ 0, 2, 0, 4 };
-    for (expected, 0..) |value, i| {
-        try std.testing.expectEqual(value, result[i]);
-    }
+    try std.testing.expectEqual(@as(usize, 3), mat.dims());
+    try std.testing.expectEqualSlices(f32, &.{ 1, 2, 3, 4 }, try mat.channelFloat(0));
+    try std.testing.expectEqualSlices(f32, &.{ 5, 6, 7, 8 }, try mat.channelFloat(1));
+    try std.testing.expectError(error.UnsupportedDims, mat.dataFloat());
+    try std.testing.expectError(error.IndexOutOfBounds, mat.channelFloat(2));
 }
