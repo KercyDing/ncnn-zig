@@ -43,6 +43,9 @@ jobs:
           - platform: windows x86_64
             runs_on: windows-latest
             upstream: false
+          - platform: windows arm64
+            runs_on: windows-11-arm
+            upstream: false
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -73,6 +76,7 @@ jobs:
       matrix:
         target:
           - x86_64-windows-gnu
+          - aarch64-windows-gnu
           - aarch64-macos
           - x86_64-macos
           - aarch64-linux-gnu
