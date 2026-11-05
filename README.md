@@ -82,7 +82,8 @@ as `-D<name>`.
 | `int8`, `weight_quant`, `bf16` | `true` | quantized paths |
 | `force_inline` | `true` | force-inline hot helpers |
 | `benchmark`, `coverage` | `false` | upstream debug switches |
-| `simpleocv`, `simpleomp`, `simplestl`, `simplemath` | `false` | minimal stubs |
+| `openmp` | `true` | parallel loops via ncnn's simpleomp runtime (POSIX) |
+| `simpleocv`, `simplestl`, `simplemath` | `false` | minimal stubs |
 | `winxp` | `false` | Windows XP compatibility |
 | `disable_rtti`, `disable_exception` | `false` | build without RTTI/exceptions |
 | `runtime_cpu` | `true` | x86 AVX/AVX512 dispatch |
@@ -107,11 +108,14 @@ const ncnn_dep = b.dependency("ncnn", .{
   are generated from the upstream sources and picked by ncnn's CPU check.
 - ARM: 32-bit builds target ARMv7 NEON/VFPv4; AArch64 also compiles FP16,
   dotprod, fp16fml, bf16 and i8mm variants for runtime dispatch.
-- Not built: AVX512-FP16, AVX-VNNI-INT16, OpenMP.
+- Not built: AVX512-FP16 and AVX-VNNI-INT16; upstream ships no kernel sources
+  for either.
 - Vulkan is not supported. ncnn builds its compute shaders through glslang,
   which is a git submodule and not part of the upstream release tarball used
   here. `-Dvulkan=true` is rejected at configure time.
-- Threading uses ncnn's built-in thread pool.
+- Parallel loops use ncnn's simpleomp runtime, so no external OpenMP library
+  is needed and `Option.setNumThreads` takes effect. simpleomp is POSIX-only;
+  Windows builds run the loops serially.
 
 Verified:
 

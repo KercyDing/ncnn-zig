@@ -23,7 +23,8 @@ pub const Options = struct {
     force_inline: bool = true,
 
     simpleocv: bool = false,
-    simpleomp: bool = false,
+    /// Parallel loops via ncnn's built-in simpleomp runtime.
+    openmp: bool = true,
     simplestl: bool = false,
     simplemath: bool = false,
     winxp: bool = false,
@@ -48,7 +49,7 @@ pub const Options = struct {
         o.linkage = b.option(std.builtin.LinkMode, "linkage", "Build ncnn as a static or shared library") orelse o.linkage;
         inline for (.{
             "stdio",        "string",            "validation", "threads",      "pixel",  "pixel_rotate", "pixel_affine",   "pixel_drawing", "batch",
-            "c_api",        "platform_api",      "int8",       "weight_quant", "bf16",   "force_inline", "simpleocv",      "simpleomp",     "simplestl",
+            "c_api",        "platform_api",      "int8",       "weight_quant", "bf16",   "force_inline", "simpleocv",      "openmp",        "simplestl",
             "simplemath",   "winxp",             "benchmark",  "coverage",     "vulkan", "simplevk",     "system_glslang", "runtime_cpu",   "gnu_inline_asm",
             "disable_rtti", "disable_exception",
         }) |name| {
@@ -133,13 +134,14 @@ pub fn platformValues(
     vfpv4: bool,
     arm82: bool,
     runtime_arm: bool,
+    openmp: bool,
 ) PlatformValues {
     return .{
         .NCNN_STDIO = o.stdio,
         .NCNN_STRING = o.string,
         .NCNN_VALIDATION = o.validation,
         .NCNN_SIMPLEOCV = o.simpleocv,
-        .NCNN_SIMPLEOMP = o.simpleomp,
+        .NCNN_SIMPLEOMP = openmp,
         .NCNN_SIMPLESTL = o.simplestl,
         .NCNN_SIMPLEMATH = o.simplemath,
         .NCNN_THREADS = o.threads,

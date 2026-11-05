@@ -27,6 +27,8 @@ pub fn build(b: *std.Build) !void {
     };
     const arm64 = t.cpu.arch.isAarch64();
     const runtime_arm = arm64 and options.runtime_cpu;
+    // simpleomp uses pthread_once, so it is POSIX only.
+    const openmp = options.openmp and t.os.tag != .windows;
     const layers = try resolveLayers(b, upstream, arch);
 
     // ncnn's base sources must be built for the architecture baseline. Its
@@ -71,6 +73,7 @@ pub fn build(b: *std.Build) !void {
         is_arm,
         arm64,
         runtime_arm,
+        openmp,
     ));
 
     const generated = b.addWriteFiles();
@@ -170,6 +173,9 @@ pub fn build(b: *std.Build) !void {
         .static => try flags.append(b.allocator, "-DNCNN_STATIC_DEFINE"),
         .dynamic => try flags.append(b.allocator, "-DNCNN_BUILDING_LIBRARY"),
     }
+
+    // Expand `#pragma omp`; ncnn's simpleomp runtime provides the symbols.
+    if (openmp) try flags.append(b.allocator, "-fopenmp");
 
     if (options.disable_rtti) try flags.append(b.allocator, "-fno-rtti");
     if (options.disable_exception) try flags.append(b.allocator, "-fno-exceptions");
