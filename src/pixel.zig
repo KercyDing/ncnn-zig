@@ -15,7 +15,7 @@ pub const Format = enum(c_int) {
 
     /// Packs a source and destination layout into an `x2y` conversion type.
     pub fn convert(src: Format, dst: Format) i32 {
-        return @intFromEnum(src) | (@as(i32, @intFromEnum(dst)) << 16);
+        return @backingInt(src) | (@as(i32, @backingInt(dst)) << 16);
     }
 };
 
