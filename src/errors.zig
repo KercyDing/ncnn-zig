@@ -42,4 +42,6 @@ pub const Error = error{
     VersionMismatch,
     // Pixel buffer is too small for the requested operation.
     InvalidPixelBuffer,
+    // Operation is not available for this build target or configuration.
+    UnsupportedOperation,
 };

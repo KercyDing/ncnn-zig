@@ -275,3 +275,33 @@ test "layer by type" {
     try std.testing.expect(layer.oneBlobOnly());
     try std.testing.expect(layer.supportInplace());
 }
+
+test "batched mat" {
+    var mat = try ncnn.Mat.create3dBatch(2, 2, 2, 3);
+    defer mat.deinit();
+
+    try std.testing.expectEqual(@as(usize, 3), mat.batch());
+    try std.testing.expect(mat.nstep() > 0);
+
+    const batch = try mat.batchFloat(0);
+    try std.testing.expectEqual(mat.cstep() * mat.channels() * mat.elempack(), batch.len);
+}
+
+test "pixel roi" {
+    const rgb: [4 * 4 * 3]u8 = @splat(0);
+
+    var mat = try ncnn.pixel.fromPixelsRoi(&rgb, @backingInt(ncnn.pixel.Format.rgb), 4, 4, 12, 1, 1, 2, 2);
+    defer mat.deinit();
+
+    try std.testing.expectEqual(@as(usize, 2), mat.width());
+    try std.testing.expectEqual(@as(usize, 2), mat.height());
+    try std.testing.expectEqual(@as(usize, 3), mat.channels());
+}
+
+test "layer type index" {
+    try std.testing.expectEqual(
+        ncnn.c.ncnn_layer_type_to_index("ReLU"),
+        ncnn.layer.typeToIndex("ReLU"),
+    );
+    try std.testing.expectEqual(@as(i32, -1), ncnn.layer.typeToIndex("NoSuchLayer"));
+}

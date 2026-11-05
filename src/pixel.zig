@@ -46,6 +46,62 @@ pub fn fromPixelsResize(
     ));
 }
 
+/// Wraps a region of interest of an image as a 3D float mat.
+pub fn fromPixelsRoi(
+    pixels: []const u8,
+    format: i32,
+    w: usize,
+    h: usize,
+    stride: usize,
+    roi_x: i32,
+    roi_y: i32,
+    roi_w: i32,
+    roi_h: i32,
+) Error!Mat {
+    return wrap(c.ncnn_mat_from_pixels_roi(
+        pixels.ptr,
+        format,
+        try dim(w),
+        try dim(h),
+        try dim(stride),
+        roi_x,
+        roi_y,
+        roi_w,
+        roi_h,
+        null,
+    ));
+}
+
+/// Wraps and resizes a region of interest of an image.
+pub fn fromPixelsRoiResize(
+    pixels: []const u8,
+    format: i32,
+    w: usize,
+    h: usize,
+    stride: usize,
+    roi_x: i32,
+    roi_y: i32,
+    roi_w: i32,
+    roi_h: i32,
+    target_w: usize,
+    target_h: usize,
+) Error!Mat {
+    return wrap(c.ncnn_mat_from_pixels_roi_resize(
+        pixels.ptr,
+        format,
+        try dim(w),
+        try dim(h),
+        try dim(stride),
+        roi_x,
+        roi_y,
+        roi_w,
+        roi_h,
+        try dim(target_w),
+        try dim(target_h),
+        null,
+    ));
+}
+
 /// Writes a float mat back into a tightly packed 8-bit image.
 pub fn toPixels(mat: Mat, pixels: []u8, format: i32, stride: usize) Error!void {
     c.ncnn_mat_to_pixels(mat.handle, pixels.ptr, format, try dim(stride));

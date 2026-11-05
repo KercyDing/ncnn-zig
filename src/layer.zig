@@ -123,11 +123,49 @@ pub const Layer = struct {
         return c.ncnn_layer_get_support_fp16_storage(self.handle) != 0;
     }
 
+    /// Layer instance name, set when the layer is loaded by a net.
+    pub fn name(self: Layer) ?[:0]const u8 {
+        const raw_name = c.ncnn_layer_get_name(self.handle);
+        if (raw_name == null) return null;
+        return std.mem.sliceTo(raw_name[0..], 0);
+    }
+
+    /// Number of bottom blobs.
+    pub fn bottomCount(self: Layer) usize {
+        return @intCast(c.ncnn_layer_get_bottom_count(self.handle));
+    }
+
+    /// Blob index of the i-th bottom.
+    pub fn bottom(self: Layer, index: usize) Error!i32 {
+        if (index >= self.bottomCount()) return Error.IndexOutOfBounds;
+        return c.ncnn_layer_get_bottom(self.handle, @intCast(index));
+    }
+
+    /// Number of top blobs.
+    pub fn topCount(self: Layer) usize {
+        return @intCast(c.ncnn_layer_get_top_count(self.handle));
+    }
+
+    /// Blob index of the i-th top.
+    pub fn top(self: Layer, index: usize) Error!i32 {
+        if (index >= self.topCount()) return Error.IndexOutOfBounds;
+        return c.ncnn_layer_get_top(self.handle, @intCast(index));
+    }
+
+    /// True when the layer accepts any packed layout.
+    pub fn setSupportAnyPacking(self: Layer, enable: bool) void {
+        c.ncnn_layer_set_support_any_packing(self.handle, @intFromBool(enable));
+    }
+
+    pub fn supportAnyPacking(self: Layer) bool {
+        return c.ncnn_layer_get_support_any_packing(self.handle) != 0;
+    }
+
     /// Layer type name for layers created by type.
     pub fn typeName(self: Layer) ?[:0]const u8 {
-        const name = c.ncnn_layer_get_type(self.handle);
-        if (name == null) return null;
-        return std.mem.sliceTo(name[0..], 0);
+        const raw_name = c.ncnn_layer_get_type(self.handle);
+        if (raw_name == null) return null;
+        return std.mem.sliceTo(raw_name[0..], 0);
     }
 
     /// Layer type index for layers created by type.
@@ -172,3 +210,12 @@ pub const Layer = struct {
         return self.handle orelse unreachable;
     }
 };
+
+/// Maps a layer type name to its type index, -1 when unknown.
+pub fn typeToIndex(layer_type: []const u8) i32 {
+    if (layer_type.len >= std.fs.max_path_bytes) return -1;
+    var buf: [std.fs.max_path_bytes]u8 = undefined;
+    @memcpy(buf[0..layer_type.len], layer_type);
+    buf[layer_type.len] = 0;
+    return c.ncnn_layer_type_to_index(buf[0..layer_type.len :0].ptr);
+}

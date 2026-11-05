@@ -171,6 +171,16 @@ pub const Option = struct {
         return c.ncnn_option_get_use_int16_storage(self.handle) != 0;
     }
 
+    /// Uses `allocator` for the kv cache; it must outlive the option's use.
+    pub fn setKvcacheAllocator(self: Option, allocator: Allocator) void {
+        c.ncnn_option_set_kvcache_allocator(self.handle, allocator.handle);
+    }
+
+    /// Hints the maximum kv cache sequence length.
+    pub fn setKvcacheMaxSeqlenHint(self: Option, max_seqlen: i32) void {
+        c.ncnn_option_set_kvcache_max_seqlen_hint(self.handle, max_seqlen);
+    }
+
     /// Uses `allocator` for blob memory; it must outlive the option's use.
     pub fn setBlobAllocator(self: Option, allocator: Allocator) void {
         c.ncnn_option_set_blob_allocator(self.handle, allocator.handle);

@@ -145,6 +145,170 @@ pub const Mat = struct {
         return wrap(dst);
     }
 
+    /// 1D vector holding `n` batches.
+    pub fn create1dBatch(w: usize, n: usize) Error!Mat {
+        return wrap(c.ncnn_mat_create_1d_batch(try dim(w), try dim(n), null));
+    }
+
+    /// 2D image holding `n` batches.
+    pub fn create2dBatch(w: usize, h: usize, n: usize) Error!Mat {
+        return wrap(c.ncnn_mat_create_2d_batch(try dim(w), try dim(h), try dim(n), null));
+    }
+
+    /// 3D tensor holding `n` batches.
+    pub fn create3dBatch(w: usize, h: usize, channel_count: usize, n: usize) Error!Mat {
+        return wrap(c.ncnn_mat_create_3d_batch(try dim(w), try dim(h), try dim(channel_count), try dim(n), null));
+    }
+
+    /// 4D tensor holding `n` batches.
+    pub fn create4dBatch(w: usize, h: usize, d: usize, channel_count: usize, n: usize) Error!Mat {
+        return wrap(c.ncnn_mat_create_4d_batch(
+            try dim(w),
+            try dim(h),
+            try dim(d),
+            try dim(channel_count),
+            try dim(n),
+            null,
+        ));
+    }
+
+    /// 1D batched vector with explicit element size and packing.
+    pub fn create1dElemBatch(w: usize, elem_size: usize, pack: usize, n: usize) Error!Mat {
+        return wrap(c.ncnn_mat_create_1d_elem_batch(try dim(w), elem_size, try dim(pack), try dim(n), null));
+    }
+
+    /// 2D batched image with explicit element size and packing.
+    pub fn create2dElemBatch(w: usize, h: usize, elem_size: usize, pack: usize, n: usize) Error!Mat {
+        return wrap(c.ncnn_mat_create_2d_elem_batch(
+            try dim(w),
+            try dim(h),
+            elem_size,
+            try dim(pack),
+            try dim(n),
+            null,
+        ));
+    }
+
+    /// 3D batched tensor with explicit element size and packing.
+    pub fn create3dElemBatch(
+        w: usize,
+        h: usize,
+        channel_count: usize,
+        elem_size: usize,
+        pack: usize,
+        n: usize,
+    ) Error!Mat {
+        return wrap(c.ncnn_mat_create_3d_elem_batch(
+            try dim(w),
+            try dim(h),
+            try dim(channel_count),
+            elem_size,
+            try dim(pack),
+            try dim(n),
+            null,
+        ));
+    }
+
+    /// 4D batched tensor with explicit element size and packing.
+    pub fn create4dElemBatch(
+        w: usize,
+        h: usize,
+        d: usize,
+        channel_count: usize,
+        elem_size: usize,
+        pack: usize,
+        n: usize,
+    ) Error!Mat {
+        return wrap(c.ncnn_mat_create_4d_elem_batch(
+            try dim(w),
+            try dim(h),
+            try dim(d),
+            try dim(channel_count),
+            elem_size,
+            try dim(pack),
+            try dim(n),
+            null,
+        ));
+    }
+
+    /// Wraps caller-owned 4D float memory, which must outlive this mat.
+    pub fn externalFloat4d(w: usize, h: usize, d: usize, channel_count: usize, data: []f32) Error!Mat {
+        if (data.len != w * h * d * channel_count) return Error.UnsupportedDims;
+        return wrap(c.ncnn_mat_create_external_4d(
+            try dim(w),
+            try dim(h),
+            try dim(d),
+            try dim(channel_count),
+            @ptrCast(data.ptr),
+            null,
+        ));
+    }
+
+    /// Wraps caller-owned memory with explicit element size and packing.
+    pub fn external1dElem(w: usize, elem_size: usize, pack: usize, data: []u8) Error!Mat {
+        return wrap(c.ncnn_mat_create_external_1d_elem(
+            try dim(w),
+            @ptrCast(data.ptr),
+            elem_size,
+            try dim(pack),
+            null,
+        ));
+    }
+
+    /// Wraps caller-owned memory with explicit element size and packing.
+    pub fn external2dElem(w: usize, h: usize, elem_size: usize, pack: usize, data: []u8) Error!Mat {
+        return wrap(c.ncnn_mat_create_external_2d_elem(
+            try dim(w),
+            try dim(h),
+            @ptrCast(data.ptr),
+            elem_size,
+            try dim(pack),
+            null,
+        ));
+    }
+
+    /// Wraps caller-owned memory with explicit element size and packing.
+    pub fn external3dElem(
+        w: usize,
+        h: usize,
+        channel_count: usize,
+        elem_size: usize,
+        pack: usize,
+        data: []u8,
+    ) Error!Mat {
+        return wrap(c.ncnn_mat_create_external_3d_elem(
+            try dim(w),
+            try dim(h),
+            try dim(channel_count),
+            @ptrCast(data.ptr),
+            elem_size,
+            try dim(pack),
+            null,
+        ));
+    }
+
+    /// Wraps caller-owned 4D memory with explicit element size and packing.
+    pub fn external4dElem(
+        w: usize,
+        h: usize,
+        d: usize,
+        channel_count: usize,
+        elem_size: usize,
+        pack: usize,
+        data: []u8,
+    ) Error!Mat {
+        return wrap(c.ncnn_mat_create_external_4d_elem(
+            try dim(w),
+            try dim(h),
+            try dim(d),
+            try dim(channel_count),
+            @ptrCast(data.ptr),
+            elem_size,
+            try dim(pack),
+            null,
+        ));
+    }
+
     /// Releases the underlying mat.
     pub fn deinit(self: *Mat) void {
         if (self.handle) |handle| c.ncnn_mat_destroy(handle);
@@ -204,6 +368,23 @@ pub const Mat = struct {
     /// Channel stride in elements.
     pub fn cstep(self: Mat) usize {
         return c.ncnn_mat_get_cstep(self.handle);
+    }
+
+    /// Batch stride in elements.
+    pub fn nstep(self: Mat) usize {
+        return c.ncnn_mat_get_nstep(self.handle);
+    }
+
+    /// Returns one batch as a flat f32 slice.
+    pub fn batchFloat(self: Mat, batch_index: usize) Error![]f32 {
+        if (!self.isFloat32()) return Error.NotFloat32;
+        if (batch_index >= self.batch()) return Error.IndexOutOfBounds;
+
+        const data = c.ncnn_mat_get_batch_data(self.handle, @intCast(batch_index)) orelse
+            return Error.NotFloat32;
+        const len = self.cstep() * self.channels() * self.elempack();
+        const ptr: [*]f32 = @ptrCast(@alignCast(data));
+        return ptr[0..len];
     }
 
     /// True when every element is a pack of plain f32 values.

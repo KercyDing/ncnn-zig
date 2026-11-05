@@ -1,6 +1,7 @@
 //! Network loading and inference wrapper.
 
 const std = @import("std");
+const builtin = @import("builtin");
 const c = @import("ncnn_c");
 const Error = @import("errors.zig").Error;
 const Mat = @import("mat.zig").Mat;
@@ -78,6 +79,51 @@ pub const Net = struct {
         var buf: [std.fs.max_path_bytes]u8 = undefined;
         const path_z = try toPathZ(&buf, path);
         if (c.ncnn_net_load_param_bin(self.handle, path_z.ptr) != 0) return Error.LoadParamFailed;
+    }
+
+    /// Loads a `.param` file from a wide path. Windows only.
+    pub fn loadParamFileW(self: Net, path: []const c.wchar_t) Error!void {
+        if (comptime builtin.os.tag == .windows) {
+            var buf: [std.fs.max_path_bytes]c.wchar_t = undefined;
+            if (path.len >= buf.len) return Error.PathTooLong;
+            @memcpy(buf[0..path.len], path);
+            buf[path.len] = 0;
+            if (c.ncnn_net_load_param_w(self.handle, buf[0..path.len :0].ptr) != 0) {
+                return Error.LoadParamFailed;
+            }
+        } else {
+            return Error.UnsupportedOperation;
+        }
+    }
+
+    /// Loads a binary `.param` file from a wide path. Windows only.
+    pub fn loadParamBinFileW(self: Net, path: []const c.wchar_t) Error!void {
+        if (comptime builtin.os.tag == .windows) {
+            var buf: [std.fs.max_path_bytes]c.wchar_t = undefined;
+            if (path.len >= buf.len) return Error.PathTooLong;
+            @memcpy(buf[0..path.len], path);
+            buf[path.len] = 0;
+            if (c.ncnn_net_load_param_bin_w(self.handle, buf[0..path.len :0].ptr) != 0) {
+                return Error.LoadParamFailed;
+            }
+        } else {
+            return Error.UnsupportedOperation;
+        }
+    }
+
+    /// Loads a `.bin` file from a wide path. Windows only.
+    pub fn loadModelFileW(self: Net, path: []const c.wchar_t) Error!void {
+        if (comptime builtin.os.tag == .windows) {
+            var buf: [std.fs.max_path_bytes]c.wchar_t = undefined;
+            if (path.len >= buf.len) return Error.PathTooLong;
+            @memcpy(buf[0..path.len], path);
+            buf[path.len] = 0;
+            if (c.ncnn_net_load_model_w(self.handle, buf[0..path.len :0].ptr) != 0) {
+                return Error.LoadModelFailed;
+            }
+        } else {
+            return Error.UnsupportedOperation;
+        }
     }
 
     /// Loads the text `.param` graph from a data reader.
