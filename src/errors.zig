@@ -12,6 +12,8 @@ pub const Error = error{
     CreateOptionFailed,
     // ncnn_mat_create returned null.
     CreateMatFailed,
+    // ncnn_paramdict_create returned null.
+    CreateParamDictFailed,
     // load_param returned non-zero.
     LoadParamFailed,
     // load_model returned non-zero.
@@ -30,4 +32,6 @@ pub const Error = error{
     IndexOutOfBounds,
     // Header version differs from the linked runtime.
     VersionMismatch,
+    // Pixel buffer is too small for the requested operation.
+    InvalidPixelBuffer,
 };

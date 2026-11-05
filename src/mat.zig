@@ -155,6 +155,26 @@ pub const Mat = struct {
         return ptr[0..len];
     }
 
+    /// Returns a reshaped view sharing this mat's data.
+    pub fn reshape1d(self: Mat, w: usize) Error!Mat {
+        return wrap(c.ncnn_mat_reshape_1d(self.handle, try dim(w), null));
+    }
+
+    /// Returns a reshaped view sharing this mat's data.
+    pub fn reshape2d(self: Mat, w: usize, h: usize) Error!Mat {
+        return wrap(c.ncnn_mat_reshape_2d(self.handle, try dim(w), try dim(h), null));
+    }
+
+    /// Returns a reshaped view sharing this mat's data.
+    pub fn reshape3d(self: Mat, w: usize, h: usize, channel_count: usize) Error!Mat {
+        return wrap(c.ncnn_mat_reshape_3d(self.handle, try dim(w), try dim(h), try dim(channel_count), null));
+    }
+
+    /// Returns a reshaped view sharing this mat's data.
+    pub fn reshape4d(self: Mat, w: usize, h: usize, d: usize, channel_count: usize) Error!Mat {
+        return wrap(c.ncnn_mat_reshape_4d(self.handle, try dim(w), try dim(h), try dim(d), try dim(channel_count), null));
+    }
+
     /// Fills every element with `value`.
     pub fn fill(self: Mat, value: f32) void {
         c.ncnn_mat_fill_float(self.handle, value);

@@ -60,3 +60,54 @@ test "mat channels" {
     try std.testing.expectError(error.UnsupportedDims, mat.dataFloat());
     try std.testing.expectError(error.IndexOutOfBounds, mat.channelFloat(2));
 }
+
+test "paramdict round trip" {
+    var pd = try ncnn.ParamDict.init();
+    defer pd.deinit();
+
+    pd.setInt(0, 7);
+    pd.setFloat(1, 0.5);
+
+    try std.testing.expectEqual(@as(i32, 7), pd.getInt(0, 0));
+    try std.testing.expectEqual(@as(f32, 0.5), pd.getFloat(1, 0.0));
+    try std.testing.expectEqual(@as(i32, 9), pd.getInt(2, 9));
+}
+
+test "mat reshape" {
+    var flat = try ncnn.Mat.fromSlice1d(&.{ 1, 2, 3, 4, 5, 6 });
+    defer flat.deinit();
+
+    var image = try flat.reshape2d(3, 2);
+    defer image.deinit();
+
+    try std.testing.expectEqual(@as(usize, 2), image.dims());
+    try std.testing.expectEqual(@as(usize, 3), image.width());
+    try std.testing.expectEqual(@as(usize, 2), image.height());
+    try std.testing.expectEqualSlices(f32, &.{ 1, 2, 3, 4, 5, 6 }, try image.dataFloat());
+}
+
+test "pixel round trip" {
+    const rgba = [_]u8{ 255, 0, 0, 128, 0, 255, 0, 64 };
+
+    var mat = try ncnn.pixel.fromPixels(&rgba, @backingInt(ncnn.pixel.Format.rgba), 2, 1, 8);
+    defer mat.deinit();
+
+    try std.testing.expectEqual(@as(usize, 3), mat.dims());
+    try std.testing.expectEqual(@as(usize, 2), mat.width());
+    try std.testing.expectEqual(@as(usize, 4), mat.channels());
+
+    var out: [rgba.len]u8 = @splat(0);
+    try ncnn.pixel.toPixels(mat, &out, @backingInt(ncnn.pixel.Format.rgba), 8);
+    try std.testing.expectEqualSlices(u8, &rgba, &out);
+}
+
+test "draw rectangle" {
+    var pixels: [4 * 4 * 3]u8 = @splat(0);
+    try ncnn.draw.rectangle(&pixels, 4, 4, 3, 0, 0, 4, 4, 0x00ff00, -1);
+
+    for (pixels, 0..) |value, i| {
+        if (i % 3 == 1) {
+            try std.testing.expectEqual(@as(u8, 0xff), value);
+        }
+    }
+}

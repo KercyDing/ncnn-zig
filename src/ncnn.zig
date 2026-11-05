@@ -10,6 +10,9 @@ pub const version = @import("version.zig");
 pub const mat = @import("mat.zig");
 pub const option = @import("option.zig");
 pub const net = @import("net.zig");
+pub const paramdict = @import("paramdict.zig");
+pub const pixel = @import("pixel.zig");
+pub const draw = @import("draw.zig");
 
 pub const Error = errors.Error;
 
@@ -24,6 +27,9 @@ pub const Net = net.Net;
 
 /// Runs one inference pass over a net.
 pub const Extractor = net.Extractor;
+
+/// Layer parameter bag.
+pub const ParamDict = paramdict.ParamDict;
 
 /// Verifies the header version matches the linked runtime.
 pub const checkVersion = version.check;
