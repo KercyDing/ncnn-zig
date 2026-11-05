@@ -35,8 +35,8 @@ pub const Options = struct {
     simplevk: bool = true,
     system_glslang: bool = false,
 
-    /// Runtime multi-ISA dispatch. Not implemented yet; must stay false.
-    runtime_cpu: bool = false,
+    /// Runtime CPU dispatch for x86 (AVX/AVX2/AVX512 variants).
+    runtime_cpu: bool = true,
 
     gnu_inline_asm: bool = true,
 
@@ -125,7 +125,7 @@ pub const PlatformValues = struct {
     NCNN_VERSION_NUMBER: i64,
 };
 
-pub fn platformValues(o: Options, version_string: []const u8, version_number: i64) PlatformValues {
+pub fn platformValues(o: Options, version_string: []const u8, version_number: i64, runtime_x86: bool) PlatformValues {
     return .{
         .NCNN_STDIO = o.stdio,
         .NCNN_STRING = o.string,
@@ -148,23 +148,23 @@ pub fn platformValues(o: Options, version_string: []const u8, version_number: i6
         .NCNN_COVERAGE = o.coverage,
         .NCNN_SIMPLEVK = o.simplevk,
         .NCNN_SYSTEM_GLSLANG = o.system_glslang,
-        .NCNN_RUNTIME_CPU = o.runtime_cpu,
+        .NCNN_RUNTIME_CPU = runtime_x86,
         .NCNN_GNU_INLINE_ASM = o.gnu_inline_asm,
-        // Architecture-specific kernels are not wired up yet; the generic
-        // implementations are always used and stay bit-identical to upstream.
-        .NCNN_AVX = false,
+        // x86 runtime dispatch: base code calls the dispatched variants.
+        // XOP/FMA4/VNNI-int8/neconvert/FP16 stay off; no variants are built.
+        .NCNN_AVX = runtime_x86,
         .NCNN_XOP = false,
-        .NCNN_FMA = false,
+        .NCNN_FMA = runtime_x86,
         .NCNN_FMA4 = false,
-        .NCNN_F16C = false,
-        .NCNN_AVX2 = false,
+        .NCNN_F16C = runtime_x86,
+        .NCNN_AVX2 = runtime_x86,
         .NCNN_AVXVNNI = false,
         .NCNN_AVXVNNIINT8 = false,
         .NCNN_AVXVNNIINT16 = false,
         .NCNN_AVXNECONVERT = false,
-        .NCNN_AVX512 = false,
-        .NCNN_AVX512VNNI = false,
-        .NCNN_AVX512BF16 = false,
+        .NCNN_AVX512 = runtime_x86,
+        .NCNN_AVX512VNNI = runtime_x86,
+        .NCNN_AVX512BF16 = runtime_x86,
         .NCNN_AVX512FP16 = false,
         .NCNN_VFPV4 = false,
         .NCNN_ARM82 = false,

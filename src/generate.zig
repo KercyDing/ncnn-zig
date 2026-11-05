@@ -6,9 +6,13 @@ pub const ResolvedLayer = struct {
     /// C++ class name / layer type string.
     name: []const u8,
     enabled: bool,
-    /// Architecture directory (`x86`, `arm`, …) when an optimized
-    /// implementation exists and is compiled in, e.g. `AbsVal_x86`.
+    /// Architecture directory (`x86`, `arm`, …) when a baseline optimized
+    /// implementation exists, e.g. `AbsVal_x86`.
     arch: ?[]const u8 = null,
+    /// `AbsVal_x86_avx` variant is compiled and registered.
+    avx: bool = false,
+    /// `AbsVal_x86_avx512` variant is compiled and registered.
+    avx512: bool = false,
 };
 
 const generated_notice =
@@ -33,6 +37,14 @@ pub fn layerDeclaration(allocator: std.mem.Allocator, layers: []const ResolvedLa
         if (layer.arch) |arch| {
             try w.print("#include \"layer/{s}/{s}_{s}.h\"\n", .{ arch, lower, arch });
             try w.print("namespace ncnn {{ DEFINE_LAYER_CREATOR({s}_{s}) }}\n", .{ layer.name, arch });
+        }
+        if (layer.avx512) {
+            try w.print("#include \"layer/x86/{s}_x86_avx512.h\"\n", .{lower});
+            try w.print("namespace ncnn {{ DEFINE_LAYER_CREATOR({s}_x86_avx512) }}\n", .{layer.name});
+        }
+        if (layer.avx) {
+            try w.print("#include \"layer/x86/{s}_x86_avx.h\"\n", .{lower});
+            try w.print("namespace ncnn {{ DEFINE_LAYER_CREATOR({s}_x86_avx) }}\n", .{layer.name});
         }
     }
 
@@ -62,24 +74,26 @@ pub fn layerRegistry(allocator: std.mem.Allocator, layers: []const ResolvedLayer
     try w.writeAll("static const layer_registry_entry layer_registry[] = {\n");
     try writeEntries(allocator, w, layers, .generic);
     try w.writeAll("};\n\nstatic const layer_registry_entry layer_registry_arch[] = {\n");
+    // No architecture-specific kernels are compiled in yet, so every arch
+    // slot is empty and `create_layer_cpu` falls back to `layer_registry`.
     try writeEntries(allocator, w, layers, .arch);
     try w.writeAll("};\n");
 
-    const variants = [_]struct { macro: []const u8, name: []const u8 }{
-        .{ .macro = "AVX512", .name = "avx512" },
-        .{ .macro = "AVX", .name = "avx" },
-        .{ .macro = "MSA", .name = "msa" },
-        .{ .macro = "LASX", .name = "lasx" },
-        .{ .macro = "LSX", .name = "lsx" },
-        .{ .macro = "RVV", .name = "rvv" },
-        .{ .macro = "XTHEADVECTOR", .name = "xtheadvector" },
+    const variants = [_]struct { macro: []const u8, name: []const u8, mode: EntryMode }{
+        .{ .macro = "AVX512", .name = "avx512", .mode = .avx512 },
+        .{ .macro = "AVX", .name = "avx", .mode = .avx },
+        .{ .macro = "MSA", .name = "msa", .mode = .none },
+        .{ .macro = "LASX", .name = "lasx", .mode = .none },
+        .{ .macro = "LSX", .name = "lsx", .mode = .none },
+        .{ .macro = "RVV", .name = "rvv", .mode = .none },
+        .{ .macro = "XTHEADVECTOR", .name = "xtheadvector", .mode = .none },
     };
     for (variants) |variant| {
         try w.print(
             "\n#if NCNN_RUNTIME_CPU && NCNN_{s}\nstatic const layer_registry_entry layer_registry_{s}[] = {{\n",
             .{ variant.macro, variant.name },
         );
-        try writeEntries(allocator, w, layers, .none);
+        try writeEntries(allocator, w, layers, variant.mode);
         try w.print("}};\n#endif // NCNN_RUNTIME_CPU && NCNN_{s}\n", .{variant.macro});
     }
 
@@ -90,7 +104,7 @@ pub fn layerRegistry(allocator: std.mem.Allocator, layers: []const ResolvedLayer
     return aw.toOwnedSlice();
 }
 
-const EntryMode = enum { generic, arch, none };
+const EntryMode = enum { generic, arch, avx, avx512, none };
 
 fn writeEntries(
     allocator: std.mem.Allocator,
@@ -106,20 +120,28 @@ fn writeEntries(
                 const arch = layer.arch orelse break :blk null;
                 break :blk try std.fmt.allocPrint(allocator, "{s}_{s}", .{ layer.name, arch });
             },
+            .avx => blk: {
+                if (!layer.enabled or !layer.avx) break :blk null;
+                break :blk try std.fmt.allocPrint(allocator, "{s}_x86_avx", .{layer.name});
+            },
+            .avx512 => blk: {
+                if (!layer.enabled or !layer.avx512) break :blk null;
+                break :blk try std.fmt.allocPrint(allocator, "{s}_x86_avx512", .{layer.name});
+            },
             .none => null,
         };
-        defer if (mode == .arch) {
-            if (creator) |c| allocator.free(c);
+        defer if (mode == .arch or mode == .avx or mode == .avx512) {
+            if (creator) |name| allocator.free(name);
         };
 
         try w.writeAll("#if NCNN_STRING\n");
-        if (creator) |c|
-            try w.print("{{\"{s}\", {s}_layer_creator}},\n", .{ layer.name, c })
+        if (creator) |name|
+            try w.print("{{\"{s}\", {s}_layer_creator}},\n", .{ layer.name, name })
         else
             try w.print("{{\"{s}\", 0}},\n", .{layer.name});
         try w.writeAll("#else\n");
-        if (creator) |c|
-            try w.print("{{{s}_layer_creator}},\n", .{c})
+        if (creator) |name|
+            try w.print("{{{s}_layer_creator}},\n", .{name})
         else
             try w.writeAll("{0},\n");
         try w.writeAll("#endif\n");
