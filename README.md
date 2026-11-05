@@ -105,7 +105,9 @@ const ncnn_dep = b.dependency("ncnn", .{
 - x86 runtime dispatch is built: AVX, FMA, F16C, AVX2, AVX512, AVX512VNNI,
   AVX512BF16, FMA4, XOP, AVX-VNNI, AVX-VNNI-INT8 and AVX-NE-CONVERT variants
   are generated from the upstream sources and picked by ncnn's CPU check.
-- Not built: arm dispatch variants, AVX512-FP16, AVX-VNNI-INT16, OpenMP.
+- ARM: 32-bit builds target ARMv7 NEON/VFPv4; AArch64 also compiles FP16,
+  dotprod, fp16fml, bf16 and i8mm variants for runtime dispatch.
+- Not built: AVX512-FP16, AVX-VNNI-INT16, OpenMP.
 - Vulkan is not supported. ncnn builds its compute shaders through glslang,
   which is a git submodule and not part of the upstream release tarball used
   here. `-Dvulkan=true` is rejected at configure time.
@@ -114,7 +116,8 @@ const ncnn_dep = b.dependency("ncnn", .{
 Verified:
 
 - `zig build` on Linux, plus compile-only cross builds for
-  `x86_64-windows-gnu` and `aarch64-macos`.
+  `x86_64-windows-gnu`, `aarch64-macos`, `aarch64-linux-gnu` and
+  `arm-linux-gnueabihf`.
 - `zig build test`: version match, options, `Input -> ReLU`, custom layer,
   data reader loading, pooled allocators, Mat layout/reshape/packing,
   ParamDict round trip, pixel round trip, drawing.

@@ -125,7 +125,15 @@ pub const PlatformValues = struct {
     NCNN_VERSION_NUMBER: i64,
 };
 
-pub fn platformValues(o: Options, version_string: []const u8, version_number: i64, runtime_x86: bool) PlatformValues {
+pub fn platformValues(
+    o: Options,
+    version_string: []const u8,
+    version_number: i64,
+    runtime_x86: bool,
+    vfpv4: bool,
+    arm82: bool,
+    runtime_arm: bool,
+) PlatformValues {
     return .{
         .NCNN_STDIO = o.stdio,
         .NCNN_STRING = o.string,
@@ -166,12 +174,12 @@ pub fn platformValues(o: Options, version_string: []const u8, version_number: i6
         .NCNN_AVX512VNNI = runtime_x86,
         .NCNN_AVX512BF16 = runtime_x86,
         .NCNN_AVX512FP16 = false,
-        .NCNN_VFPV4 = false,
-        .NCNN_ARM82 = false,
-        .NCNN_ARM82DOT = false,
-        .NCNN_ARM82FP16FML = false,
-        .NCNN_ARM84BF16 = false,
-        .NCNN_ARM84I8MM = false,
+        .NCNN_VFPV4 = vfpv4,
+        .NCNN_ARM82 = arm82,
+        .NCNN_ARM82DOT = runtime_arm,
+        .NCNN_ARM82FP16FML = runtime_arm,
+        .NCNN_ARM84BF16 = runtime_arm,
+        .NCNN_ARM84I8MM = runtime_arm,
         .NCNN_ARM86SVE = false,
         .NCNN_ARM86SVE2 = false,
         .NCNN_ARM86SVEBF16 = false,

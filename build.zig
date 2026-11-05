@@ -21,13 +21,26 @@ pub fn build(b: *std.Build) !void {
 
     const arch = archDirName(t.cpu.arch);
     const runtime_x86 = if (arch) |a| std.mem.eql(u8, a, "x86") and options.runtime_cpu and t.abi != .msvc else false;
+    const arm32 = switch (t.cpu.arch) {
+        .arm, .armeb, .thumb, .thumbeb => true,
+        else => false,
+    };
+    const arm64 = t.cpu.arch.isAarch64();
+    const runtime_arm = arm64 and options.runtime_cpu;
     const layers = try resolveLayers(b, upstream, arch);
 
     // ncnn's base sources must be built for the architecture baseline. Its
     // `#if __AVX__` style blocks belong to separately generated ISA variants,
     // so letting the host CPU features leak in (the default for a native
     // target) produces an inconsistent library.
-    const c_target = if (arch != null) baselineTarget(b, target) else target;
+    // 32-bit ARM needs NEON + VFPv4, which the default armv6 baseline lacks.
+    const c_target = if (arch == null)
+        target
+    else if (arm32)
+        armv7Target(b, target)
+    else
+        baselineTarget(b, target);
+    const is_arm = arch != null and std.mem.eql(u8, arch.?, "arm");
 
     const mod = b.createModule(.{
         .target = c_target,
@@ -50,7 +63,15 @@ pub fn build(b: *std.Build) !void {
     const platform = b.addConfigHeader(.{
         .style = .{ .cmake = src_dir.path(b, "platform.h.in") },
         .include_path = "platform.h",
-    }, config.platformValues(options, sources.version.string, sources.version.number, runtime_x86));
+    }, config.platformValues(
+        options,
+        sources.version.string,
+        sources.version.number,
+        runtime_x86,
+        is_arm,
+        arm64,
+        runtime_arm,
+    ));
 
     const generated = b.addWriteFiles();
 
@@ -223,6 +244,60 @@ pub fn build(b: *std.Build) !void {
                 const source_rel = try std.fmt.allocPrint(
                     b.allocator,
                     "src/layer/x86/{s}_x86_{s}.cpp",
+                    .{ lower, isa.name },
+                );
+                _ = upstream.builder.root.statFile(b.graph.io, source_rel) catch continue;
+                try group.append(b.allocator, source_rel);
+            }
+
+            if (group.items.len == 0) continue;
+            const group_flags = try flagsWithFeatures(b.allocator, flags.items, isa.features);
+            mod.addCSourceFiles(.{
+                .root = upstream.path(""),
+                .files = group.items,
+                .flags = group_flags,
+            });
+        }
+    }
+
+    if (is_arm) {
+        var arm_isas: std.ArrayList(ArmIsa) = .empty;
+        defer arm_isas.deinit(b.allocator);
+
+        if (arm64) {
+            // ARM82 and VFPv4 kernels are compiled regardless of runtime
+            // dispatch, matching the upstream options.
+            try arm_isas.appendSlice(b.allocator, &.{
+                .{ .name = "vfpv4", .features = &arm_baseline_features },
+                .{ .name = "asimdhp", .features = &arm_fp16_features },
+            });
+            if (runtime_arm) {
+                try arm_isas.appendSlice(b.allocator, &.{
+                    .{ .name = "asimddp", .features = &arm_dotprod_features },
+                    .{ .name = "asimdfhm", .features = &arm_fp16fml_features },
+                    .{ .name = "bf16", .features = &arm_bf16_features },
+                    .{ .name = "i8mm", .features = &arm_i8mm_features },
+                });
+            }
+        } else {
+            try arm_isas.append(b.allocator, .{ .name = "vfpv4", .features = &arm_vfpv4_features });
+        }
+
+        for (arm_isas.items) |isa| {
+            var group: std.ArrayList([]const u8) = .empty;
+            defer group.deinit(b.allocator);
+
+            for (layers) |layer| {
+                if (!layer.enabled) continue;
+                const a = layer.arch orelse continue;
+                if (!std.mem.eql(u8, a, "arm")) continue;
+
+                const lower = try std.ascii.allocLowerString(b.allocator, layer.name);
+                defer b.allocator.free(lower);
+
+                const source_rel = try std.fmt.allocPrint(
+                    b.allocator,
+                    "src/layer/arm/{s}_arm_{s}.cpp",
                     .{ lower, isa.name },
                 );
                 _ = upstream.builder.root.statFile(b.graph.io, source_rel) catch continue;
@@ -457,6 +532,16 @@ const avxneconvert_features = avx2_features ++ [_][]const u8{"avxneconvert"};
 const avx512bf16_features = avx512_features ++ [_][]const u8{"avx512bf16"};
 const avx512vnni_avx512bf16_features = avx512_features ++ [_][]const u8{ "avx512vnni", "avx512bf16" };
 
+const ArmIsa = struct { name: []const u8, features: []const []const u8 };
+
+const arm_baseline_features = [_][]const u8{};
+const arm_vfpv4_features = [_][]const u8{ "neon", "vfp4" };
+const arm_fp16_features = [_][]const u8{"fullfp16"};
+const arm_dotprod_features = arm_fp16_features ++ [_][]const u8{"dotprod"};
+const arm_fp16fml_features = arm_fp16_features ++ [_][]const u8{"fp16fml"};
+const arm_bf16_features = arm_dotprod_features ++ [_][]const u8{"bf16"};
+const arm_i8mm_features = arm_dotprod_features ++ [_][]const u8{"i8mm"};
+
 /// Appends `features` to the common compile flags as cc1 target features.
 fn flagsWithFeatures(
     allocator: std.mem.Allocator,
@@ -487,9 +572,17 @@ fn appendArchFlags(
         }
         // Reciprocal approximations lose precision; upstream disables them too.
         if (t.abi != .msvc) try flags.append(allocator, "-mrecip=none");
-    } else if (std.mem.eql(u8, arch, "arm") and (t.cpu.arch == .arm or t.cpu.arch == .armeb or t.cpu.arch == .thumb or t.cpu.arch == .thumbeb)) {
-        try flags.append(allocator, "-mfpu=neon-vfpv4");
     }
+}
+
+/// Resolves the same OS/ABI as `target` with an ARMv7 CPU that has NEON and
+/// VFPv4, matching upstream's `-mfpu=neon-vfpv4`.
+fn armv7Target(b: *std.Build, target: std.Build.ResolvedTarget) std.Build.ResolvedTarget {
+    var query = target.query;
+    query.cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_a7 };
+    query.cpu_features_add = .empty;
+    query.cpu_features_sub = .empty;
+    return b.resolveTargetQuery(query);
 }
 
 /// Resolves the same OS/ABI as `target` with the architecture baseline CPU
