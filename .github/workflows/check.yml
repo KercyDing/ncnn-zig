@@ -97,10 +97,15 @@ jobs:
         shell: bash
         run: zig build run
 
-      - name: Build ppocrv6 example
+      - name: Run ppocrv6 example
         if: matrix.platform == 'linux x86_64'
         working-directory: examples/ppocrv6
-        run: zig build
+        shell: bash
+        run: |
+          output=$(zig build run 2>&1)
+          echo "$output"
+          grep -Fq "output: 48x6906" <<<"$output"
+          grep -Fq "text: 绿洲仕格维花园公寓" <<<"$output"
 
   cross:
     name: Cross build (${{ matrix.target }})
