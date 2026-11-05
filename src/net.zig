@@ -143,12 +143,14 @@ pub const Net = struct {
     }
 
     /// Blob index of the i-th network input.
-    pub fn inputIndex(self: Net, index: usize) i32 {
+    pub fn inputIndex(self: Net, index: usize) Error!i32 {
+        if (index >= self.inputCount()) return Error.IndexOutOfBounds;
         return c.ncnn_net_get_input_index(self.handle, @intCast(index));
     }
 
     /// Blob index of the i-th network output.
-    pub fn outputIndex(self: Net, index: usize) i32 {
+    pub fn outputIndex(self: Net, index: usize) Error!i32 {
+        if (index >= self.outputCount()) return Error.IndexOutOfBounds;
         return c.ncnn_net_get_output_index(self.handle, @intCast(index));
     }
 

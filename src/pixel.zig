@@ -35,6 +35,7 @@ pub fn fromPixelsResize(
     target_w: usize,
     target_h: usize,
 ) Error!Mat {
+    if (target_w == 0 or target_h == 0) return Error.InvalidParameter;
     try checkSource(pixels, format, w, h, stride);
     return wrap(c.ncnn_mat_from_pixels_resize(
         pixels.ptr,
@@ -90,6 +91,7 @@ pub fn fromPixelsRoiResize(
     target_w: usize,
     target_h: usize,
 ) Error!Mat {
+    if (target_w == 0 or target_h == 0) return Error.InvalidParameter;
     try checkSource(pixels, format, w, h, stride);
     try checkRoi(w, h, roi_x, roi_y, roi_w, roi_h);
     return wrap(c.ncnn_mat_from_pixels_roi_resize(
@@ -160,6 +162,7 @@ pub fn makeBorder(
     border_type: i32,
     value: f32,
 ) Error!Mat {
+    if (top < 0 or bottom < 0 or left < 0 or right < 0) return Error.InvalidParameter;
     const dst = c.ncnn_mat_create() orelse return Error.CreateMatFailed;
     c.ncnn_copy_make_border(src.handle, dst, top, bottom, left, right, border_type, value, null);
     return .{ .handle = dst };
@@ -167,6 +170,7 @@ pub fn makeBorder(
 
 /// Returns a cropped copy of `src`.
 pub fn cutBorder(src: Mat, top: i32, bottom: i32, left: i32, right: i32) Error!Mat {
+    if (top < 0 or bottom < 0 or left < 0 or right < 0) return Error.InvalidParameter;
     const dst = c.ncnn_mat_create() orelse return Error.CreateMatFailed;
     c.ncnn_copy_cut_border(src.handle, dst, top, bottom, left, right, null);
     return .{ .handle = dst };
@@ -184,6 +188,9 @@ pub fn makeBorder3d(
     border_type: i32,
     value: f32,
 ) Error!Mat {
+    if (top < 0 or bottom < 0 or left < 0 or right < 0 or front < 0 or behind < 0) {
+        return Error.InvalidParameter;
+    }
     const dst = c.ncnn_mat_create() orelse return Error.CreateMatFailed;
     c.ncnn_copy_make_border_3d(src.handle, dst, top, bottom, left, right, front, behind, border_type, value, null);
     return .{ .handle = dst };
@@ -199,6 +206,9 @@ pub fn cutBorder3d(
     front: i32,
     behind: i32,
 ) Error!Mat {
+    if (top < 0 or bottom < 0 or left < 0 or right < 0 or front < 0 or behind < 0) {
+        return Error.InvalidParameter;
+    }
     const dst = c.ncnn_mat_create() orelse return Error.CreateMatFailed;
     c.ncnn_copy_cut_border_3d(src.handle, dst, top, bottom, left, right, front, behind, null);
     return .{ .handle = dst };
@@ -224,6 +234,7 @@ fn destinationChannels(format: i32) Error!usize {
 
 /// Validates an input image and its stride.
 fn checkSource(pixels: []const u8, format: i32, w: usize, h: usize, stride: usize) Error!void {
+    if (w == 0 or h == 0) return Error.InvalidParameter;
     const channels = try sourceChannels(format);
     const required = try imageBytes(w, h, channels, stride);
     if (pixels.len < required) return Error.InvalidBufferSize;
@@ -239,7 +250,9 @@ fn checkDestination(
     stride: usize,
 ) Error!void {
     if (mat.dims() != 3) return Error.InvalidParameter;
+    if (mat.batch() > 1) return Error.InvalidParameter;
     if (mat.channels() != try sourceChannels(format)) return Error.InvalidParameter;
+    if (target_w == 0 or target_h == 0) return Error.InvalidParameter;
 
     const channels = try destinationChannels(format);
     const required = try imageBytes(target_w, target_h, channels, stride);

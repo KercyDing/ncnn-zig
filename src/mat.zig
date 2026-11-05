@@ -8,7 +8,9 @@ const Option = @import("option.zig").Option;
 /// Owns an `ncnn::Mat` allocated through the C API.
 ///
 /// Channels may carry alignment padding, so prefer `channelFloat` over
-/// assuming one contiguous buffer.
+/// assuming one contiguous buffer. External buffers passed to the
+/// `external*` constructors must outlive the mat and include that padding;
+/// keep them 16-byte aligned since ncnn emits aligned SIMD loads.
 pub const Mat = struct {
     handle: c.ncnn_mat_t,
 
@@ -66,16 +68,19 @@ pub const Mat = struct {
 
     /// 1D vector with explicit element size and packing.
     pub fn create1dElem(w: usize, elem_size: usize, pack: usize) Error!Mat {
+        try checkElem(elem_size, pack);
         return wrap(c.ncnn_mat_create_1d_elem(try dim(w), elem_size, try dim(pack), null));
     }
 
     /// 2D image with explicit element size and packing.
     pub fn create2dElem(w: usize, h: usize, elem_size: usize, pack: usize) Error!Mat {
+        try checkElem(elem_size, pack);
         return wrap(c.ncnn_mat_create_2d_elem(try dim(w), try dim(h), elem_size, try dim(pack), null));
     }
 
     /// 3D tensor with explicit element size and packing.
     pub fn create3dElem(w: usize, h: usize, channel_count: usize, elem_size: usize, pack: usize) Error!Mat {
+        try checkElem(elem_size, pack);
         return wrap(c.ncnn_mat_create_3d_elem(
             try dim(w),
             try dim(h),
@@ -88,6 +93,7 @@ pub const Mat = struct {
 
     /// 4D tensor with explicit element size and packing.
     pub fn create4dElem(w: usize, h: usize, d: usize, channel_count: usize, elem_size: usize, pack: usize) Error!Mat {
+        try checkElem(elem_size, pack);
         return wrap(c.ncnn_mat_create_4d_elem(
             try dim(w),
             try dim(h),
@@ -106,7 +112,7 @@ pub const Mat = struct {
 
     /// Wraps caller-owned row-major float memory, which must outlive this mat.
     pub fn externalFloat2d(w: usize, h: usize, data: []f32) Error!Mat {
-        if (data.len != w * h) return Error.UnsupportedDims;
+        if (data.len < w * h) return Error.InvalidBufferSize;
         return wrap(c.ncnn_mat_create_external_2d(try dim(w), try dim(h), @ptrCast(data.ptr), null));
     }
 
@@ -155,21 +161,25 @@ pub const Mat = struct {
 
     /// 1D vector holding `n` batches.
     pub fn create1dBatch(w: usize, n: usize) Error!Mat {
+        try checkBatch(n);
         return wrap(c.ncnn_mat_create_1d_batch(try dim(w), try dim(n), null));
     }
 
     /// 2D image holding `n` batches.
     pub fn create2dBatch(w: usize, h: usize, n: usize) Error!Mat {
+        try checkBatch(n);
         return wrap(c.ncnn_mat_create_2d_batch(try dim(w), try dim(h), try dim(n), null));
     }
 
     /// 3D tensor holding `n` batches.
     pub fn create3dBatch(w: usize, h: usize, channel_count: usize, n: usize) Error!Mat {
+        try checkBatch(n);
         return wrap(c.ncnn_mat_create_3d_batch(try dim(w), try dim(h), try dim(channel_count), try dim(n), null));
     }
 
     /// 4D tensor holding `n` batches.
     pub fn create4dBatch(w: usize, h: usize, d: usize, channel_count: usize, n: usize) Error!Mat {
+        try checkBatch(n);
         return wrap(c.ncnn_mat_create_4d_batch(
             try dim(w),
             try dim(h),
@@ -182,11 +192,13 @@ pub const Mat = struct {
 
     /// 1D batched vector with explicit element size and packing.
     pub fn create1dElemBatch(w: usize, elem_size: usize, pack: usize, n: usize) Error!Mat {
+        try checkBatch(n);
         return wrap(c.ncnn_mat_create_1d_elem_batch(try dim(w), elem_size, try dim(pack), try dim(n), null));
     }
 
     /// 2D batched image with explicit element size and packing.
     pub fn create2dElemBatch(w: usize, h: usize, elem_size: usize, pack: usize, n: usize) Error!Mat {
+        try checkBatch(n);
         return wrap(c.ncnn_mat_create_2d_elem_batch(
             try dim(w),
             try dim(h),
@@ -206,6 +218,8 @@ pub const Mat = struct {
         pack: usize,
         n: usize,
     ) Error!Mat {
+        try checkBatch(n);
+        try checkElem(elem_size, pack);
         return wrap(c.ncnn_mat_create_3d_elem_batch(
             try dim(w),
             try dim(h),
@@ -227,6 +241,8 @@ pub const Mat = struct {
         pack: usize,
         n: usize,
     ) Error!Mat {
+        try checkBatch(n);
+        try checkElem(elem_size, pack);
         return wrap(c.ncnn_mat_create_4d_elem_batch(
             try dim(w),
             try dim(h),
@@ -256,6 +272,9 @@ pub const Mat = struct {
 
     /// Wraps caller-owned memory with explicit element size and packing.
     pub fn external1dElem(w: usize, elem_size: usize, pack: usize, data: []u8) Error!Mat {
+        try checkElem(elem_size, pack);
+        const required = std.math.mul(usize, w, elem_size) catch return Error.InvalidBufferSize;
+        if (data.len < required) return Error.InvalidBufferSize;
         return wrap(c.ncnn_mat_create_external_1d_elem(
             try dim(w),
             @ptrCast(data.ptr),
@@ -267,6 +286,10 @@ pub const Mat = struct {
 
     /// Wraps caller-owned memory with explicit element size and packing.
     pub fn external2dElem(w: usize, h: usize, elem_size: usize, pack: usize, data: []u8) Error!Mat {
+        try checkElem(elem_size, pack);
+        const plane = std.math.mul(usize, w, h) catch return Error.InvalidBufferSize;
+        const required = std.math.mul(usize, plane, elem_size) catch return Error.InvalidBufferSize;
+        if (data.len < required) return Error.InvalidBufferSize;
         return wrap(c.ncnn_mat_create_external_2d_elem(
             try dim(w),
             try dim(h),
@@ -413,6 +436,7 @@ pub const Mat = struct {
     ///
     /// Skips alignment padding between channels.
     pub fn channelFloat(self: Mat, index: usize) Error![]f32 {
+        if (self.batch() > 1) return Error.UnsupportedDims;
         if (!self.isFloat32()) return Error.NotFloat32;
         if (index >= self.channels()) return Error.IndexOutOfBounds;
 
@@ -427,6 +451,7 @@ pub const Mat = struct {
     ///
     /// 3D and 4D mats may have padded channels, use `channelFloat`.
     pub fn dataFloat(self: Mat) Error![]f32 {
+        if (self.batch() > 1) return Error.UnsupportedDims;
         if (!self.isFloat32()) return Error.NotFloat32;
 
         const len: usize = switch (self.dims()) {
@@ -476,6 +501,14 @@ pub const Mat = struct {
 /// Rejects null handles early.
 fn wrap(handle: c.ncnn_mat_t) Error!Mat {
     return .{ .handle = handle orelse return Error.CreateMatFailed };
+}
+
+fn checkElem(elem_size: usize, pack: usize) Error!void {
+    if (elem_size == 0 or pack == 0) return Error.InvalidParameter;
+}
+
+fn checkBatch(n: usize) Error!void {
+    if (n == 0) return Error.InvalidParameter;
 }
 
 /// Rejects external buffers that do not include ncnn's channel padding.

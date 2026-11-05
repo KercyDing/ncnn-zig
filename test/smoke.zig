@@ -219,8 +219,9 @@ test "datareader param" {
 
     try net.loadParamDatareader(reader);
     try std.testing.expectEqual(@as(usize, 1), net.inputCount());
-    try std.testing.expectEqual(@as(i32, 0), net.inputIndex(0));
-    try std.testing.expectEqual(@as(i32, 1), net.outputIndex(0));
+    try std.testing.expectEqual(@as(i32, 0), try net.inputIndex(0));
+    try std.testing.expectEqual(@as(i32, 1), try net.outputIndex(0));
+    try std.testing.expectError(error.IndexOutOfBounds, net.inputIndex(1));
 }
 
 test "allocator option" {
@@ -365,4 +366,39 @@ test "mean normalize channel check" {
 
     const full = [_]f32{ 0, 0, 0 };
     try ncnn.pixel.subtractMeanNormalize(mat, &full, null);
+}
+
+test "batched mats require batchFloat" {
+    var mat = try ncnn.Mat.create1dBatch(4, 2);
+    defer mat.deinit();
+
+    try std.testing.expectError(error.UnsupportedDims, mat.dataFloat());
+    try std.testing.expectError(error.UnsupportedDims, mat.channelFloat(0));
+
+    const first = try mat.batchFloat(0);
+    try std.testing.expectEqual(@as(usize, 4), first.len);
+}
+
+test "invalid mat parameters" {
+    try std.testing.expectError(error.InvalidParameter, ncnn.Mat.create1dElem(4, 0, 1));
+    try std.testing.expectError(error.InvalidParameter, ncnn.Mat.create1dBatch(4, 0));
+
+    var buf: [4]u8 = @splat(0);
+    try std.testing.expectError(error.InvalidBufferSize, ncnn.Mat.external1dElem(8, 4, 1, &buf));
+}
+
+test "invalid pixel parameters" {
+    const rgb: [4 * 4 * 3]u8 = @splat(0);
+    const rgb_format = @backingInt(ncnn.pixel.Format.rgb);
+
+    try std.testing.expectError(error.InvalidParameter, ncnn.pixel.fromPixels(&rgb, rgb_format, 0, 4, 12));
+
+    var src = try ncnn.Mat.fromSlice1d(&.{ 1, 2, 3 });
+    defer src.deinit();
+    try std.testing.expectError(error.InvalidParameter, ncnn.pixel.makeBorder(src, -1, 0, 0, 0, 0, 0));
+
+    var batched = try ncnn.Mat.create3dBatch(2, 2, 3, 2);
+    defer batched.deinit();
+    var out: [2 * 2 * 3]u8 = @splat(0);
+    try std.testing.expectError(error.InvalidParameter, ncnn.pixel.toPixels(batched, &out, rgb_format, 6));
 }
