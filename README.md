@@ -37,9 +37,9 @@ The package also exports a Zig module named `ncnn`:
 exe.root_module.addImport("ncnn", ncnn_dep.module("ncnn"));
 ```
 
-The module wraps `Net`, `Extractor`, `Mat`, `Option`, `ParamDict` and custom
-layers, plus pixel conversion and drawing helpers. It links the library for
-you.
+The module wraps `Net`, `Extractor`, `Mat`, `Option`, `ParamDict`, custom
+layers, data readers and allocators, plus pixel conversion and drawing
+helpers. It links the library for you.
 
 ```zig
 const ncnn = @import("ncnn");
@@ -116,7 +116,8 @@ Verified:
 - `zig build` on Linux, plus compile-only cross builds for
   `x86_64-windows-gnu` and `aarch64-macos`.
 - `zig build test`: version match, options, `Input -> ReLU`, custom layer,
-  Mat layout/reshape/packing, ParamDict round trip, pixel round trip, drawing.
+  data reader loading, pooled allocators, Mat layout/reshape/packing,
+  ParamDict round trip, pixel round trip, drawing.
 - `zig build test-upstream`: six upstream layer tests against this library.
 
 Everything else in the wrapper is unverified.
