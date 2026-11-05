@@ -422,6 +422,7 @@ pub const Mat = struct {
         const data = c.ncnn_mat_get_batch_data(self.handle, @intCast(batch_index)) orelse
             return Error.NotFloat32;
         const len = self.cstep() * self.channels() * self.elempack();
+        if (@intFromPtr(data) % @alignOf(f32) != 0) return Error.NotFloat32;
         const ptr: [*]f32 = @ptrCast(@alignCast(data));
         return ptr[0..len];
     }
@@ -443,6 +444,7 @@ pub const Mat = struct {
         const data = c.ncnn_mat_get_channel_data(self.handle, @intCast(index)) orelse
             return Error.NotFloat32;
         const len = self.width() * self.height() * self.depth() * self.elempack();
+        if (@intFromPtr(data) % @alignOf(f32) != 0) return Error.NotFloat32;
         const ptr: [*]f32 = @ptrCast(@alignCast(data));
         return ptr[0..len];
     }
@@ -461,6 +463,7 @@ pub const Mat = struct {
         };
 
         const data = c.ncnn_mat_get_data(self.handle) orelse return Error.NotFloat32;
+        if (@intFromPtr(data) % @alignOf(f32) != 0) return Error.NotFloat32;
         const ptr: [*]f32 = @ptrCast(@alignCast(data));
         return ptr[0..len];
     }

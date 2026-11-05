@@ -402,3 +402,25 @@ test "invalid pixel parameters" {
     var out: [2 * 2 * 3]u8 = @splat(0);
     try std.testing.expectError(error.InvalidParameter, ncnn.pixel.toPixels(batched, &out, rgb_format, 6));
 }
+
+test "misaligned external mat" {
+    var raw: [13]u8 = @splat(0);
+    // Skip one byte so the element pointer is not f32 aligned.
+    var mat = try ncnn.Mat.external1dElem(3, 4, 1, raw[1..13]);
+    defer mat.deinit();
+
+    try std.testing.expectError(error.NotFloat32, mat.dataFloat());
+    try std.testing.expectError(error.NotFloat32, mat.channelFloat(0));
+}
+
+test "empty datareader fails cleanly" {
+    var net = try ncnn.Net.init();
+    defer net.deinit();
+
+    // The C API installs default callbacks that read nothing.
+    var reader = try ncnn.DataReader.init();
+    defer reader.deinit();
+
+    try std.testing.expectError(error.LoadParamFailed, net.loadParamDatareader(reader));
+    try std.testing.expectError(error.LoadModelFailed, net.loadModelDatareader(reader));
+}
