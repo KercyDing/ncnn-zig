@@ -8,6 +8,7 @@ const sources = @import("src/sources.zig");
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+    const strip = b.option(bool, "strip", "Strip debug symbols") orelse false;
     const options = config.Options.fromBuild(b);
 
     if (options.vulkan) {
@@ -52,6 +53,7 @@ pub fn build(b: *std.Build) !void {
     const mod = b.createModule(.{
         .target = c_target,
         .optimize = optimize,
+        .strip = strip,
         .link_libc = true,
         .link_libcpp = true,
         // ncnn is third-party C++ with intentional type punning and pointer
