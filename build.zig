@@ -29,6 +29,9 @@ pub fn build(b: *std.Build) !void {
     const runtime_arm = arm64 and options.runtime_cpu;
     // simpleomp uses pthread_once, so it is POSIX only.
     const openmp = options.openmp and t.os.tag != .windows;
+    // LLVM cannot emit SEH unwind info for the GNU asm blocks in the arm
+    // kernels on aarch64-windows.
+    const gnu_inline_asm = options.gnu_inline_asm and !(t.os.tag == .windows and t.cpu.arch.isAarch64());
     const layers = try resolveLayers(b, upstream, arch);
 
     // ncnn's base sources must be built for the architecture baseline. Its
@@ -74,6 +77,7 @@ pub fn build(b: *std.Build) !void {
         arm64,
         runtime_arm,
         openmp,
+        gnu_inline_asm,
     ));
 
     const generated = b.addWriteFiles();

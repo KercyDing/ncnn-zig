@@ -135,6 +135,7 @@ pub fn platformValues(
     arm82: bool,
     runtime_arm: bool,
     openmp: bool,
+    gnu_inline_asm: bool,
 ) PlatformValues {
     return .{
         .NCNN_STDIO = o.stdio,
@@ -159,7 +160,7 @@ pub fn platformValues(
         .NCNN_SIMPLEVK = o.simplevk,
         .NCNN_SYSTEM_GLSLANG = o.system_glslang,
         .NCNN_RUNTIME_CPU = runtime_x86,
-        .NCNN_GNU_INLINE_ASM = o.gnu_inline_asm,
+        .NCNN_GNU_INLINE_ASM = gnu_inline_asm,
         // x86 runtime dispatch: base code calls the dispatched variants.
         // AVX512-FP16 and AVXVNNI-INT16 have no upstream sources and stay off.
         .NCNN_AVX = runtime_x86,
