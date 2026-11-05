@@ -1,0 +1,29 @@
+.{
+    .name = .ncnn_zig,
+    .version = "0.0.1",
+    .fingerprint = 0xa3004af96a6f709d,
+    .minimum_zig_version = "0.17.0",
+    .dependencies = .{
+        .ncnn = .{
+            .url = "https://github.com/Tencent/ncnn/archive/refs/tags/20261020.tar.gz",
+            .hash = "N-V-__8AAOoXuQNchW6Il3BwYzdW_dSC1jXgg9fgPL7icwn5",
+            .paths = .{
+                "LICENSE.txt",
+                "src",
+                "tests",
+            },
+        },
+        .translate_c = .{
+            .url = "git+https://codeberg.org/ziglang/translate-c#cfac21f3199b2b02ce3fd7db652aa456421fe4ab",
+            .hash = "translate_c-2.0.2-Q_BUWvBNBwDnyehSiuAJmdFcMYHYGA-Jc3KiYdrV2Dqx",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "test",
+        "LICENSE",
+        "README.md",
+    },
+}
