@@ -266,3 +266,12 @@ test "3d border" {
     try std.testing.expectEqual(@as(usize, 4), bordered.height());
     try std.testing.expectEqual(@as(usize, 4), bordered.channels());
 }
+
+test "layer by type" {
+    var layer = try ncnn.Layer.createByType("ReLU");
+    defer layer.deinit();
+
+    // ReLU enables both in its constructor.
+    try std.testing.expect(layer.oneBlobOnly());
+    try std.testing.expect(layer.supportInplace());
+}

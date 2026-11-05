@@ -50,6 +50,23 @@ pub const Layer = struct {
         return .{ .handle = c.ncnn_layer_create() orelse return Error.CreateLayerFailed };
     }
 
+    /// Creates a built-in layer by type name.
+    pub fn createByType(layer_type: []const u8) Error!Layer {
+        if (layer_type.len >= std.fs.max_path_bytes) return Error.PathTooLong;
+        var buf: [std.fs.max_path_bytes]u8 = undefined;
+        @memcpy(buf[0..layer_type.len], layer_type);
+        buf[layer_type.len] = 0;
+
+        const handle = c.ncnn_layer_create_by_type(buf[0..layer_type.len :0].ptr);
+        return .{ .handle = handle orelse return Error.CreateLayerFailed };
+    }
+
+    /// Creates a built-in layer by type index.
+    pub fn createByTypeIndex(typeindex: i32) Error!Layer {
+        const handle = c.ncnn_layer_create_by_typeindex(typeindex);
+        return .{ .handle = handle orelse return Error.CreateLayerFailed };
+    }
+
     /// Releases the layer.
     pub fn deinit(self: *Layer) void {
         if (self.handle) |handle| c.ncnn_layer_destroy(handle);

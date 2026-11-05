@@ -50,6 +50,13 @@ pub const Net = struct {
         if (c.ncnn_net_load_param_memory(self.handle, param.ptr) != 0) return Error.LoadParamFailed;
     }
 
+    /// Loads a binary `.param` graph from memory and returns bytes consumed.
+    pub fn loadParamBinMemory(self: Net, data: []const u8) Error!usize {
+        const consumed = c.ncnn_net_load_param_bin_memory(self.handle, data.ptr);
+        if (consumed == 0) return Error.LoadParamFailed;
+        return consumed;
+    }
+
     /// Loads weights from a `.bin` file.
     pub fn loadModelFile(self: Net, path: []const u8) Error!void {
         var buf: [std.fs.max_path_bytes]u8 = undefined;

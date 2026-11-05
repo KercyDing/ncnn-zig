@@ -58,6 +58,41 @@ pub const Mat = struct {
         return mat;
     }
 
+    /// 1D vector with explicit element size and packing.
+    pub fn create1dElem(w: usize, elem_size: usize, pack: usize) Error!Mat {
+        return wrap(c.ncnn_mat_create_1d_elem(try dim(w), elem_size, try dim(pack), null));
+    }
+
+    /// 2D image with explicit element size and packing.
+    pub fn create2dElem(w: usize, h: usize, elem_size: usize, pack: usize) Error!Mat {
+        return wrap(c.ncnn_mat_create_2d_elem(try dim(w), try dim(h), elem_size, try dim(pack), null));
+    }
+
+    /// 3D tensor with explicit element size and packing.
+    pub fn create3dElem(w: usize, h: usize, channel_count: usize, elem_size: usize, pack: usize) Error!Mat {
+        return wrap(c.ncnn_mat_create_3d_elem(
+            try dim(w),
+            try dim(h),
+            try dim(channel_count),
+            elem_size,
+            try dim(pack),
+            null,
+        ));
+    }
+
+    /// 4D tensor with explicit element size and packing.
+    pub fn create4dElem(w: usize, h: usize, d: usize, channel_count: usize, elem_size: usize, pack: usize) Error!Mat {
+        return wrap(c.ncnn_mat_create_4d_elem(
+            try dim(w),
+            try dim(h),
+            try dim(d),
+            try dim(channel_count),
+            elem_size,
+            try dim(pack),
+            null,
+        ));
+    }
+
     /// Wraps caller-owned float memory, which must outlive this mat.
     pub fn externalFloat1d(data: []f32) Error!Mat {
         return wrap(c.ncnn_mat_create_external_1d(try dim(data.len), @ptrCast(data.ptr), null));
