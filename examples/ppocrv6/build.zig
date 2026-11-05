@@ -35,6 +35,7 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(exe);
 
     const run = b.addRunArtifact(exe);
+    run.step.dependOn(b.getInstallStep());
     run.addPassthruArgs();
     const step = b.step("run", "Run PP-OCRv6 text-line recognition");
     step.dependOn(&run.step);

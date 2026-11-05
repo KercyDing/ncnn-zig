@@ -27,6 +27,19 @@ example():
     | cd examples/relu
     | zig build run
 
+[help] Run relu Example
+[fail] relu failed.
+run-relu():
+    | cd examples/relu
+    | zig build run -Doptimize=safe -Dstrip=true
+
+[help] Run PP-OCRv6 Example
+[desc] Recognizes one cropped text line with the embedded tiny model.
+[fail] ppocrv6 failed.
+run-ppocrv6():
+    | cd examples/ppocrv6
+    | zig build run -Doptimize=safe -Dstrip=true
+
 [help] Format
 [pass] Formatting complete.
 [fail] Formatting failed.

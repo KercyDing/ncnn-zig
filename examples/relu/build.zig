@@ -33,6 +33,7 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(exe);
 
     const run = b.addRunArtifact(exe);
+    run.step.dependOn(b.getInstallStep());
     const step = b.step("run", "Run the example");
     step.dependOn(&run.step);
 }
