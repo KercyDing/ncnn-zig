@@ -84,6 +84,7 @@ as `-D<name>`.
 | `simpleocv`, `simpleomp`, `simplestl`, `simplemath` | `false` | minimal stubs |
 | `winxp` | `false` | Windows XP compatibility |
 | `disable_rtti`, `disable_exception` | `false` | build without RTTI/exceptions |
+| `runtime_cpu` | `true` | x86 AVX/AVX512 dispatch |
 
 ```zig
 const ncnn_dep = b.dependency("ncnn", .{
@@ -100,8 +101,11 @@ const ncnn_dep = b.dependency("ncnn", .{
 - This matches how upstream compiles its base sources.
 - Optimized `src/layer/x86` and `src/layer/arm` kernels are included when they
   exist.
-- Not implemented: per-ISA variants, runtime CPU dispatch, Vulkan, OpenMP.
-- `runtime_cpu` and `vulkan` are rejected at configure time.
+- x86 runtime dispatch is built: AVX, FMA, F16C, AVX2, AVX512, AVX512VNNI and
+  AVX512BF16 variants are generated from the upstream sources and picked by
+  ncnn's CPU check.
+- Not built: arm dispatch variants, XOP/FMA4, AVX-VNNI, AVX512-FP16, Vulkan,
+  OpenMP. `vulkan` is rejected at configure time.
 - Threading uses ncnn's built-in thread pool.
 
 Verified:
