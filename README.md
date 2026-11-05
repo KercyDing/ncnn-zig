@@ -125,6 +125,8 @@ Verified:
 
 Everything else in the wrapper is unverified.
 
+A runnable consumer example lives in [`examples/relu`](examples/relu).
+
 ## Development
 
 ```bash
@@ -136,3 +138,10 @@ zig build test-upstream # upstream layer tests (kernels vs naive reference)
 
 ncnn's C++ is built with `sanitize_c = .off`. Upstream relies on type punning
 and pointer arithmetic that UBSan rejects.
+
+## License
+
+The build integration and Zig wrapper are MIT licensed (`LICENSE`).
+
+ncnn is fetched from upstream at build time and is BSD 3-Clause licensed
+(`NOTICE`, upstream `LICENSE.txt`).
