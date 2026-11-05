@@ -104,8 +104,10 @@ const ncnn_dep = b.dependency("ncnn", .{
 - x86 runtime dispatch is built: AVX, FMA, F16C, AVX2, AVX512, AVX512VNNI,
   AVX512BF16, FMA4, XOP, AVX-VNNI, AVX-VNNI-INT8 and AVX-NE-CONVERT variants
   are generated from the upstream sources and picked by ncnn's CPU check.
-- Not built: arm dispatch variants, AVX512-FP16, AVX-VNNI-INT16, Vulkan,
-  OpenMP. `vulkan` is rejected at configure time.
+- Not built: arm dispatch variants, AVX512-FP16, AVX-VNNI-INT16, OpenMP.
+- Vulkan is not supported. ncnn builds its compute shaders through glslang,
+  which is a git submodule and not part of the upstream release tarball used
+  here. `-Dvulkan=true` is rejected at configure time.
 - Threading uses ncnn's built-in thread pool.
 
 Verified:
