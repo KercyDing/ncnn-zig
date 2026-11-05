@@ -1,0 +1,44 @@
+!version 0.5
+
+[help] Run Unit Tests
+[pass] Tests passed.
+[fail] Tests failed.
+test(arg..):
+    zig build test {{arg}}
+
+[help] Run Upstream Layer Tests
+[desc] Compare the dispatched kernels against ncnn's naive reference.
+[pass] Upstream tests passed.
+[fail] Upstream tests failed.
+test-upstream(arg..):
+    zig build test-upstream {{arg}}
+
+[help] Generate and Type-check Bindings
+[pass] Bindings are clean.
+[fail] Bindings check failed.
+bindings(arg..):
+    zig build bindings {{arg}}
+
+[help] Check Example Package Contract
+[desc] Build and run the consumer example against the package.
+[pass] Example contract holds.
+[fail] Example contract failed.
+example():
+    | cd examples/relu
+    | zig build run
+
+[help] Format
+[pass] Formatting complete.
+[fail] Formatting failed.
+fmt():
+    zig fmt src test examples build.zig build.zig.zon
+
+[help] Clean Cache and Output
+[desc] Remove every build artifact, including the example package caches.
+[pass] Clean complete.
+[fail] Clean failed.
+clean():
+    rm -rf .zig-cache zig-out zig-pkg
+
+    | cd examples/relu
+    | rm -rf .zig-cache zig-out zig-pkg
