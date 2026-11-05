@@ -196,6 +196,11 @@ pub fn build(b: *std.Build) !void {
         // `convolution_x86_avx2.cpp`.
         const isa_sources = [_]struct { name: []const u8, features: []const []const u8 }{
             .{ .name = "fma", .features = &fma_features },
+            .{ .name = "fma4", .features = &fma4_features },
+            .{ .name = "xop", .features = &xop_features },
+            .{ .name = "avxvnni", .features = &avxvnni_features },
+            .{ .name = "avxvnniint8", .features = &avxvnniint8_features },
+            .{ .name = "avxneconvert", .features = &avxneconvert_features },
             .{ .name = "f16c", .features = &f16c_features },
             .{ .name = "avx2", .features = &avx2_features },
             .{ .name = "avx512vnni", .features = &avx512vnni_features },
@@ -444,6 +449,11 @@ const avx512_features = avx2_features ++ [_][]const u8{
     "avx512f", "avx512cd", "avx512bw", "avx512dq", "avx512vl",
 };
 const avx512vnni_features = avx512_features ++ [_][]const u8{"avx512vnni"};
+const fma4_features = avx_features ++ [_][]const u8{ "xop", "fma4" };
+const xop_features = avx_features ++ [_][]const u8{"xop"};
+const avxvnni_features = avx2_features ++ [_][]const u8{"avxvnni"};
+const avxvnniint8_features = avxvnni_features ++ [_][]const u8{"avxvnniint8"};
+const avxneconvert_features = avx2_features ++ [_][]const u8{"avxneconvert"};
 const avx512bf16_features = avx512_features ++ [_][]const u8{"avx512bf16"};
 const avx512vnni_avx512bf16_features = avx512_features ++ [_][]const u8{ "avx512vnni", "avx512bf16" };
 

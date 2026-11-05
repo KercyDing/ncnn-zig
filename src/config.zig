@@ -151,17 +151,17 @@ pub fn platformValues(o: Options, version_string: []const u8, version_number: i6
         .NCNN_RUNTIME_CPU = runtime_x86,
         .NCNN_GNU_INLINE_ASM = o.gnu_inline_asm,
         // x86 runtime dispatch: base code calls the dispatched variants.
-        // XOP/FMA4/VNNI-int8/neconvert/FP16 stay off; no variants are built.
+        // AVX512-FP16 and AVXVNNI-INT16 have no upstream sources and stay off.
         .NCNN_AVX = runtime_x86,
-        .NCNN_XOP = false,
+        .NCNN_XOP = runtime_x86,
         .NCNN_FMA = runtime_x86,
-        .NCNN_FMA4 = false,
+        .NCNN_FMA4 = runtime_x86,
         .NCNN_F16C = runtime_x86,
         .NCNN_AVX2 = runtime_x86,
-        .NCNN_AVXVNNI = false,
-        .NCNN_AVXVNNIINT8 = false,
+        .NCNN_AVXVNNI = runtime_x86,
+        .NCNN_AVXVNNIINT8 = runtime_x86,
         .NCNN_AVXVNNIINT16 = false,
-        .NCNN_AVXNECONVERT = false,
+        .NCNN_AVXNECONVERT = runtime_x86,
         .NCNN_AVX512 = runtime_x86,
         .NCNN_AVX512VNNI = runtime_x86,
         .NCNN_AVX512BF16 = runtime_x86,
