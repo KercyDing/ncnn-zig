@@ -141,7 +141,9 @@ and pointer arithmetic that UBSan rejects.
 
 ## License
 
-The build integration and Zig wrapper are MIT licensed (`LICENSE`).
+The build integration and the Zig wrapper are licensed under the
+[MIT License](LICENSE).
 
-ncnn is fetched from upstream at build time and is BSD 3-Clause licensed
-(`NOTICE`, upstream `LICENSE.txt`).
+ncnn is fetched from upstream at build time and is licensed under the
+[BSD 3-Clause License](https://github.com/Tencent/ncnn/blob/master/LICENSE.txt).
+Details in [NOTICE](NOTICE).
