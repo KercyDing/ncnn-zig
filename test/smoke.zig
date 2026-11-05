@@ -305,3 +305,64 @@ test "layer type index" {
     );
     try std.testing.expectEqual(@as(i32, -1), ncnn.layer.typeToIndex("NoSuchLayer"));
 }
+
+test "fromSlice3d channel padding" {
+    const values = [_]f32{
+        1,  2,  3,
+        4,  5,  6,
+        7,  8,  9,
+        10, 11, 12,
+        13, 14, 15,
+        16, 17, 18,
+    };
+
+    var mat = try ncnn.Mat.fromSlice3d(3, 3, 2, &values);
+    defer mat.deinit();
+
+    try std.testing.expectEqualSlices(f32, &.{ 1, 2, 3, 4, 5, 6, 7, 8, 9 }, try mat.channelFloat(0));
+    try std.testing.expectEqualSlices(f32, &.{ 10, 11, 12, 13, 14, 15, 16, 17, 18 }, try mat.channelFloat(1));
+}
+
+test "external mat padding" {
+    var tight: [18]f32 = @splat(0);
+    try std.testing.expectError(error.InvalidBufferSize, ncnn.Mat.externalFloat3d(3, 3, 2, &tight));
+
+    var padded: [24]f32 = @splat(0);
+    for (&padded, 0..) |*value, i| value.* = @floatFromInt(i);
+
+    var mat = try ncnn.Mat.externalFloat3d(3, 3, 2, &padded);
+    defer mat.deinit();
+
+    try std.testing.expectEqualSlices(f32, &.{ 0, 1, 2, 3, 4, 5, 6, 7, 8 }, try mat.channelFloat(0));
+    try std.testing.expectEqualSlices(f32, &.{ 12, 13, 14, 15, 16, 17, 18, 19, 20 }, try mat.channelFloat(1));
+}
+
+test "pixel buffer validation" {
+    const rgb: [4 * 4 * 3]u8 = @splat(0);
+    const rgb_format = @backingInt(ncnn.pixel.Format.rgb);
+
+    try std.testing.expectError(error.InvalidBufferSize, ncnn.pixel.fromPixels(rgb[0..40], rgb_format, 4, 4, 12));
+    try std.testing.expectError(error.InvalidBufferSize, ncnn.pixel.fromPixels(&rgb, rgb_format, 4, 4, 8));
+
+    var mat = try ncnn.pixel.fromPixels(&rgb, rgb_format, 4, 4, 12);
+    defer mat.deinit();
+
+    var out: [4 * 4 * 3]u8 = @splat(0);
+    try std.testing.expectError(error.InvalidBufferSize, ncnn.pixel.toPixels(mat, out[0..40], rgb_format, 12));
+
+    try std.testing.expectError(
+        error.InvalidParameter,
+        ncnn.pixel.fromPixelsRoi(&rgb, rgb_format, 4, 4, 12, 3, 0, 2, 2),
+    );
+}
+
+test "mean normalize channel check" {
+    var mat = try ncnn.Mat.fromSlice3d(1, 1, 3, &.{ 1, 2, 3 });
+    defer mat.deinit();
+
+    const short = [_]f32{0};
+    try std.testing.expectError(error.InvalidParameter, ncnn.pixel.subtractMeanNormalize(mat, &short, null));
+
+    const full = [_]f32{ 0, 0, 0 };
+    try ncnn.pixel.subtractMeanNormalize(mat, &full, null);
+}

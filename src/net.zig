@@ -67,6 +67,7 @@ pub const Net = struct {
 
     /// Loads weights from memory and returns the bytes consumed.
     ///
+    /// ncnn has no length parameter, so `data` must cover a complete model.
     /// The consumed count matters when one buffer holds several models.
     pub fn loadModelMemory(self: Net, data: []const u8) Error!usize {
         const consumed = c.ncnn_net_load_model_memory(self.handle, data.ptr);

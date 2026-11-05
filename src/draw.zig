@@ -109,7 +109,7 @@ pub fn text(
 /// Rejects buffers that cannot hold `w * h * channels` bytes.
 fn check(pixels: []u8, w: usize, h: usize, channels: usize) Error!void {
     if (channels < 1 or channels > 4) return Error.UnsupportedDims;
-    if (pixels.len < w * h * channels) return Error.InvalidPixelBuffer;
+    if (pixels.len < w * h * channels) return Error.InvalidBufferSize;
 }
 
 /// ncnn sizes are `int`.

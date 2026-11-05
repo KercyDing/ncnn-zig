@@ -54,7 +54,13 @@ pub const Mat = struct {
         if (data.len != w * h * channel_count) return Error.UnsupportedDims;
         var mat = try create3d(w, h, channel_count);
         errdefer mat.deinit();
-        @memcpy(mat.floatSpan(data.len), data);
+
+        // Channels are padded to 16 bytes, so copy plane by plane.
+        const plane = w * h;
+        for (0..channel_count) |q| {
+            const dst = try mat.channelFloat(q);
+            @memcpy(dst, data[q * plane ..][0..plane]);
+        }
         return mat;
     }
 
@@ -105,8 +111,10 @@ pub const Mat = struct {
     }
 
     /// Wraps caller-owned float memory, which must outlive this mat.
+    ///
+    /// The buffer must leave room for ncnn's per-channel 16-byte alignment.
     pub fn externalFloat3d(w: usize, h: usize, channel_count: usize, data: []f32) Error!Mat {
-        if (data.len != w * h * channel_count) return Error.UnsupportedDims;
+        try checkExternalFloat3d(w, h, channel_count, data.len);
         return wrap(c.ncnn_mat_create_external_3d(
             try dim(w),
             try dim(h),
@@ -232,8 +240,10 @@ pub const Mat = struct {
     }
 
     /// Wraps caller-owned 4D float memory, which must outlive this mat.
+    ///
+    /// The buffer must leave room for ncnn's per-channel 16-byte alignment.
     pub fn externalFloat4d(w: usize, h: usize, d: usize, channel_count: usize, data: []f32) Error!Mat {
-        if (data.len != w * h * d * channel_count) return Error.UnsupportedDims;
+        try checkExternalBytes(w, h, d, @sizeOf(f32), channel_count, data.len * @sizeOf(f32));
         return wrap(c.ncnn_mat_create_external_4d(
             try dim(w),
             try dim(h),
@@ -268,6 +278,8 @@ pub const Mat = struct {
     }
 
     /// Wraps caller-owned memory with explicit element size and packing.
+    ///
+    /// The buffer must leave room for ncnn's per-channel 16-byte alignment.
     pub fn external3dElem(
         w: usize,
         h: usize,
@@ -276,6 +288,7 @@ pub const Mat = struct {
         pack: usize,
         data: []u8,
     ) Error!Mat {
+        try checkExternalBytes(w, h, 1, elem_size, channel_count, data.len);
         return wrap(c.ncnn_mat_create_external_3d_elem(
             try dim(w),
             try dim(h),
@@ -288,6 +301,8 @@ pub const Mat = struct {
     }
 
     /// Wraps caller-owned 4D memory with explicit element size and packing.
+    ///
+    /// The buffer must leave room for ncnn's per-channel 16-byte alignment.
     pub fn external4dElem(
         w: usize,
         h: usize,
@@ -297,6 +312,7 @@ pub const Mat = struct {
         pack: usize,
         data: []u8,
     ) Error!Mat {
+        try checkExternalBytes(w, h, d, elem_size, channel_count, data.len);
         return wrap(c.ncnn_mat_create_external_4d_elem(
             try dim(w),
             try dim(h),
@@ -460,6 +476,27 @@ pub const Mat = struct {
 /// Rejects null handles early.
 fn wrap(handle: c.ncnn_mat_t) Error!Mat {
     return .{ .handle = handle orelse return Error.CreateMatFailed };
+}
+
+/// Rejects external buffers that do not include ncnn's channel padding.
+fn checkExternalBytes(
+    w: usize,
+    h: usize,
+    d: usize,
+    elem_size: usize,
+    channel_count: usize,
+    buffer_bytes: usize,
+) Error!void {
+    const plane = std.math.mul(usize, w, h) catch return Error.InvalidBufferSize;
+    const volume = std.math.mul(usize, plane, d) catch return Error.InvalidBufferSize;
+    const bytes = std.math.mul(usize, volume, elem_size) catch return Error.InvalidBufferSize;
+    const padded = (bytes + 15) & ~@as(usize, 15);
+    const required = std.math.mul(usize, padded, channel_count) catch return Error.InvalidBufferSize;
+    if (buffer_bytes < required) return Error.InvalidBufferSize;
+}
+
+fn checkExternalFloat3d(w: usize, h: usize, channel_count: usize, len: usize) Error!void {
+    return checkExternalBytes(w, h, 1, @sizeOf(f32), channel_count, len * @sizeOf(f32));
 }
 
 /// ncnn sizes are `int`.

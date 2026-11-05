@@ -40,8 +40,12 @@ pub const Error = error{
     IndexOutOfBounds,
     // Header version differs from the linked runtime.
     VersionMismatch,
-    // Pixel buffer is too small for the requested operation.
-    InvalidPixelBuffer,
+    // Buffer is too small for the requested layout or stride.
+    InvalidBufferSize,
+    // Pixel format is not one of the supported layouts.
+    UnsupportedPixelFormat,
+    // Argument does not match the mat shape or channel count.
+    InvalidParameter,
     // Operation is not available for this build target or configuration.
     UnsupportedOperation,
 };
