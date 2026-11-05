@@ -101,6 +101,38 @@ pub fn cutBorder(src: Mat, top: i32, bottom: i32, left: i32, right: i32) Error!M
     return .{ .handle = dst };
 }
 
+/// Returns a 3D bordered copy of `src`, padding channels with `front`/`behind`.
+pub fn makeBorder3d(
+    src: Mat,
+    top: i32,
+    bottom: i32,
+    left: i32,
+    right: i32,
+    front: i32,
+    behind: i32,
+    border_type: i32,
+    value: f32,
+) Error!Mat {
+    const dst = c.ncnn_mat_create() orelse return Error.CreateMatFailed;
+    c.ncnn_copy_make_border_3d(src.handle, dst, top, bottom, left, right, front, behind, border_type, value, null);
+    return .{ .handle = dst };
+}
+
+/// Returns a 3D cropped copy of `src`.
+pub fn cutBorder3d(
+    src: Mat,
+    top: i32,
+    bottom: i32,
+    left: i32,
+    right: i32,
+    front: i32,
+    behind: i32,
+) Error!Mat {
+    const dst = c.ncnn_mat_create() orelse return Error.CreateMatFailed;
+    c.ncnn_copy_cut_border_3d(src.handle, dst, top, bottom, left, right, front, behind, null);
+    return .{ .handle = dst };
+}
+
 /// Rejects null handles early.
 fn wrap(handle: c.ncnn_mat_t) Error!Mat {
     return .{ .handle = handle orelse return Error.CreateMatFailed };

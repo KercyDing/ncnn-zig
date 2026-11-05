@@ -16,6 +16,12 @@ pub const Error = error{
     CreateParamDictFailed,
     // ncnn_layer_create returned null.
     CreateLayerFailed,
+    // ncnn_datareader_create returned null.
+    CreateDataReaderFailed,
+    // ncnn_modelbin_create returned null.
+    CreateModelBinFailed,
+    // ncnn_allocator_create returned null.
+    CreateAllocatorFailed,
     // load_param returned non-zero.
     LoadParamFailed,
     // load_model returned non-zero.

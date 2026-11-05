@@ -6,6 +6,7 @@ const Error = @import("errors.zig").Error;
 const Mat = @import("mat.zig").Mat;
 const Option = @import("option.zig").Option;
 const layer = @import("layer.zig");
+const DataReader = @import("datareader.zig").DataReader;
 
 /// Owns an `ncnn::Net`.
 pub const Net = struct {
@@ -63,6 +64,38 @@ pub const Net = struct {
         const consumed = c.ncnn_net_load_model_memory(self.handle, data.ptr);
         if (consumed == 0) return Error.LoadModelFailed;
         return consumed;
+    }
+
+    /// Loads a binary `.param` file.
+    pub fn loadParamBinFile(self: Net, path: []const u8) Error!void {
+        var buf: [std.fs.max_path_bytes]u8 = undefined;
+        const path_z = try toPathZ(&buf, path);
+        if (c.ncnn_net_load_param_bin(self.handle, path_z.ptr) != 0) return Error.LoadParamFailed;
+    }
+
+    /// Loads the text `.param` graph from a data reader.
+    pub fn loadParamDatareader(self: Net, reader: DataReader) Error!void {
+        if (c.ncnn_net_load_param_datareader(self.handle, reader.handle) != 0) return Error.LoadParamFailed;
+    }
+
+    /// Loads a binary `.param` graph from a data reader.
+    pub fn loadParamBinDatareader(self: Net, reader: DataReader) Error!void {
+        if (c.ncnn_net_load_param_bin_datareader(self.handle, reader.handle) != 0) return Error.LoadParamFailed;
+    }
+
+    /// Loads weights from a data reader.
+    pub fn loadModelDatareader(self: Net, reader: DataReader) Error!void {
+        if (c.ncnn_net_load_model_datareader(self.handle, reader.handle) != 0) return Error.LoadModelFailed;
+    }
+
+    /// Blob index of the i-th network input.
+    pub fn inputIndex(self: Net, index: usize) i32 {
+        return c.ncnn_net_get_input_index(self.handle, @intCast(index));
+    }
+
+    /// Blob index of the i-th network output.
+    pub fn outputIndex(self: Net, index: usize) i32 {
+        return c.ncnn_net_get_output_index(self.handle, @intCast(index));
     }
 
     /// Releases every loaded layer and blob.

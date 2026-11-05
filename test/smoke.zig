@@ -209,3 +209,60 @@ test "custom layer" {
 
     try std.testing.expectEqualSlices(f32, &.{ 101, 102, 103 }, try output.dataFloat());
 }
+
+test "datareader param" {
+    var net = try ncnn.Net.init();
+    defer net.deinit();
+
+    var reader = try ncnn.DataReader.fromMemory(param);
+    defer reader.deinit();
+
+    try net.loadParamDatareader(reader);
+    try std.testing.expectEqual(@as(usize, 1), net.inputCount());
+    try std.testing.expectEqual(@as(i32, 0), net.inputIndex(0));
+    try std.testing.expectEqual(@as(i32, 1), net.outputIndex(0));
+}
+
+test "allocator option" {
+    var allocator = try ncnn.Allocator.initPool();
+    defer allocator.deinit();
+
+    var option = try ncnn.Option.init();
+    defer option.deinit();
+    option.setBlobAllocator(allocator);
+    option.setWorkspaceAllocator(allocator);
+
+    var net = try ncnn.Net.init();
+    defer net.deinit();
+    net.setOption(option);
+    try net.loadParamMemory(param);
+
+    var extractor = try net.createExtractor();
+    defer extractor.deinit();
+    extractor.setOption(option);
+
+    var input = try ncnn.Mat.fromSlice1d(&.{ -1, 2 });
+    defer input.deinit();
+    try extractor.input("data", input);
+
+    var output = try extractor.extract("out");
+    defer output.deinit();
+    try std.testing.expectEqualSlices(f32, &.{ 0, 2 }, try output.dataFloat());
+}
+
+test "3d border" {
+    const values = [_]f32{
+        1, 2, 3, 4,
+        5, 6, 7, 8,
+    };
+
+    var mat = try ncnn.Mat.fromSlice3d(2, 2, 2, &values);
+    defer mat.deinit();
+
+    var bordered = try ncnn.pixel.makeBorder3d(mat, 1, 1, 1, 1, 1, 1, 0, 0.0);
+    defer bordered.deinit();
+
+    try std.testing.expectEqual(@as(usize, 4), bordered.width());
+    try std.testing.expectEqual(@as(usize, 4), bordered.height());
+    try std.testing.expectEqual(@as(usize, 4), bordered.channels());
+}

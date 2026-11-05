@@ -2,6 +2,7 @@
 
 const c = @import("ncnn_c");
 const Error = @import("errors.zig").Error;
+const Allocator = @import("allocator.zig").Allocator;
 
 /// Owns an `ncnn::Option`.
 ///
@@ -168,5 +169,15 @@ pub const Option = struct {
 
     pub fn useInt16Storage(self: Option) bool {
         return c.ncnn_option_get_use_int16_storage(self.handle) != 0;
+    }
+
+    /// Uses `allocator` for blob memory; it must outlive the option's use.
+    pub fn setBlobAllocator(self: Option, allocator: Allocator) void {
+        c.ncnn_option_set_blob_allocator(self.handle, allocator.handle);
+    }
+
+    /// Uses `allocator` for workspace memory; it must outlive the option's use.
+    pub fn setWorkspaceAllocator(self: Option, allocator: Allocator) void {
+        c.ncnn_option_set_workspace_allocator(self.handle, allocator.handle);
     }
 };

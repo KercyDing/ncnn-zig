@@ -14,6 +14,9 @@ pub const paramdict = @import("paramdict.zig");
 pub const pixel = @import("pixel.zig");
 pub const draw = @import("draw.zig");
 pub const layer = @import("layer.zig");
+pub const datareader = @import("datareader.zig");
+pub const modelbin = @import("modelbin.zig");
+pub const allocator = @import("allocator.zig");
 
 pub const Error = errors.Error;
 
@@ -34,6 +37,15 @@ pub const ParamDict = paramdict.ParamDict;
 
 /// Custom layer handle.
 pub const Layer = layer.Layer;
+
+/// Model data source.
+pub const DataReader = datareader.DataReader;
+
+/// Weight reader for custom layers.
+pub const ModelBin = modelbin.ModelBin;
+
+/// Pool allocator for blob and workspace memory.
+pub const Allocator = allocator.Allocator;
 
 /// Verifies the header version matches the linked runtime.
 pub const checkVersion = version.check;
