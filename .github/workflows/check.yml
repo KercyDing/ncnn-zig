@@ -18,7 +18,7 @@ jobs:
           version: 0.17.1
 
       - name: Check formatting
-        run: zig fmt --check build.zig src test examples/relu/build.zig examples/relu/src
+        run: zig fmt --check build.zig src test examples/relu/build.zig examples/relu/src examples/ppocrv6/build.zig examples/ppocrv6/src
 
   dispatch:
     name: Dispatch subsets
@@ -96,6 +96,11 @@ jobs:
         working-directory: examples/relu
         shell: bash
         run: zig build run
+
+      - name: Build ppocrv6 example
+        if: matrix.platform == 'linux x86_64'
+        working-directory: examples/ppocrv6
+        run: zig build
 
   cross:
     name: Cross build (${{ matrix.target }})

@@ -1,0 +1,19 @@
+.{
+    .name = .ppocrv6_example,
+    .version = "0.0.0",
+    .fingerprint = 0x321bd9a3e641c951,
+    .minimum_zig_version = "0.17.1",
+    .dependencies = .{
+        .ncnn = .{ .path = "../.." },
+        .zignal = .{
+            .url = "git+https://github.com/arrufat/zignal#6a14fedfb3249b597883e79adc6ec3d7ffd2cc10",
+            .hash = "zignal-0.12.0-dev-OrZ3s82KKgCsPD83scYfJYzqYjS46SeHN_BqCV5vlZhI",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "README.md",
+    },
+}

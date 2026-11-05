@@ -148,7 +148,9 @@ Verified:
 
 Everything else in the wrapper is unverified.
 
-A runnable consumer example lives in [`examples/relu`](examples/relu).
+A runnable consumer example lives in [`examples/relu`](examples/relu), and a
+PP-OCRv6 text-line recognition demo lives in
+[`examples/ppocrv6`](examples/ppocrv6).
 
 ## Development
 
