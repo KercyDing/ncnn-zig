@@ -48,7 +48,7 @@ jobs:
           ! zig build bindings -Dx86_isa=avx2
           ! zig build bindings -Dx86_isa=all,avx2
           ! zig build bindings -Dtarget=aarch64-linux-gnu -Darm_isa=asimddp
-          ! zig build bindings -Dtarget=aarch64-linux-gnu -Druntime_cpu=false
+          ! zig build bindings -Dtarget=aarch64-linux-gnu -Druntime_x86=false
 
   test:
     name: Build and test (${{ matrix.platform }})

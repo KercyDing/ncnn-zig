@@ -78,7 +78,7 @@ pub const Options = struct {
 
     /// Runtime CPU dispatch for x86 (AVX/AVX2/AVX512 variants). aarch64
     /// dispatch is controlled by `arm_isa`.
-    runtime_cpu: bool = true,
+    runtime_x86: bool = true,
 
     /// x86 dispatch subset: `all`, `off`, or comma-separated `X86Isa` names.
     x86_isa: []const u8 = "all",
@@ -95,7 +95,7 @@ pub const Options = struct {
         inline for (.{
             "stdio",        "string",            "validation", "threads",      "pixel",  "pixel_rotate", "pixel_affine",   "pixel_drawing", "batch",
             "c_api",        "platform_api",      "int8",       "weight_quant", "bf16",   "force_inline", "simpleocv",      "openmp",        "simplestl",
-            "simplemath",   "winxp",             "benchmark",  "coverage",     "vulkan", "simplevk",     "system_glslang", "runtime_cpu",   "gnu_inline_asm",
+            "simplemath",   "winxp",             "benchmark",  "coverage",     "vulkan", "simplevk",     "system_glslang", "runtime_x86",   "gnu_inline_asm",
             "disable_rtti", "disable_exception",
         }) |name| {
             @field(o, name) = b.option(bool, name, "ncnn " ++ name) orelse @field(o, name);

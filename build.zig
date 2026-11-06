@@ -22,12 +22,12 @@ pub fn build(b: *std.Build) !void {
 
     const arch = archDirName(t.cpu.arch);
     const is_x86 = if (arch) |a| std.mem.eql(u8, a, "x86") else false;
-    const x86_dispatch = is_x86 and options.runtime_cpu and t.abi != .msvc;
+    const x86_dispatch = is_x86 and options.runtime_x86 and t.abi != .msvc;
     const x86_isa = x86: {
         if (!is_x86) break :x86 std.EnumSet(config.X86Isa).empty;
         if (!x86_dispatch) {
             if (!std.mem.eql(u8, options.x86_isa, "all") and !std.mem.eql(u8, options.x86_isa, "off"))
-                fail("x86_isa requires runtime_cpu=true and a non-MSVC ABI", .{});
+                fail("x86_isa requires runtime_x86=true and a non-MSVC ABI", .{});
             break :x86 std.EnumSet(config.X86Isa).empty;
         }
         const set = parseIsaOrExit(config.X86Isa, options.x86_isa, "x86_isa", x86_isa_names);
@@ -39,8 +39,8 @@ pub fn build(b: *std.Build) !void {
         else => false,
     };
     const arm64 = t.cpu.arch.isAarch64();
-    if (arm64 and !options.runtime_cpu and !std.mem.eql(u8, options.arm_isa, "off"))
-        fail("runtime_cpu is x86-only; pass -Darm_isa=off to disable aarch64 dispatch", .{});
+    if (arm64 and !options.runtime_x86 and !std.mem.eql(u8, options.arm_isa, "off"))
+        fail("runtime_x86 is x86-only; pass -Darm_isa=off to disable aarch64 dispatch", .{});
     const arm_isa = if (arm64)
         parseIsaOrExit(config.ArmIsa, options.arm_isa, "arm_isa", arm_isa_names)
     else
