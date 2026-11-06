@@ -7,11 +7,6 @@
         .ncnn = .{
             .url = "https://github.com/Tencent/ncnn/archive/refs/tags/20261020.tar.gz",
             .hash = "N-V-__8AAOoXuQNchW6Il3BwYzdW_dSC1jXgg9fgPL7icwn5",
-            .paths = .{
-                "LICENSE.txt",
-                "src",
-                "tests",
-            },
         },
         .translate_c = .{
             .url = "git+https://codeberg.org/ziglang/translate-c#cfac21f3199b2b02ce3fd7db652aa456421fe4ab",

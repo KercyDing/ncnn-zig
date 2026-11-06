@@ -18,7 +18,7 @@ Zig wrapper for [ncnn](https://github.com/Tencent/ncnn)'s standalone
 Add the package:
 
 ```bash
-zig fetch --save=ncnn git+https://github.com/kercyding/ncnn.zig
+zig fetch --save=ncnn git+https://github.com/kercyding/ncnn.zig#main
 ```
 
 Link it from `build.zig`:
