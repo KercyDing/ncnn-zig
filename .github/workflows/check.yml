@@ -4,9 +4,49 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    outputs:
+      fmt: ${{ steps.filter.outputs.fmt }}
+      lib: ${{ steps.filter.outputs.lib }}
+      examples: ${{ steps.filter.outputs.examples }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Detect changed areas
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            fmt:
+              - '**/*.zig'
+              - '.github/workflows/check.yml'
+            lib:
+              - 'build.zig'
+              - 'build.zig.zon'
+              - 'src/**'
+              - 'test/**'
+              - '.github/workflows/check.yml'
+            examples:
+              - 'examples/**/*.zig'
+              - 'examples/**/*.zon'
+              - 'examples/**/src/**'
+              - 'build.zig'
+              - 'build.zig.zon'
+              - 'src/**'
+              - '.github/workflows/check.yml'
+
   fmt:
     name: Format
+    needs: changes
+    if: needs.changes.outputs.fmt == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -22,7 +62,10 @@ jobs:
 
   dispatch:
     name: Dispatch subsets
-    needs: fmt
+    needs: [changes, fmt]
+    if: |
+      !cancelled() && needs.changes.outputs.lib == 'true' &&
+      (needs.fmt.result == 'success' || needs.fmt.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -52,7 +95,10 @@ jobs:
 
   test:
     name: Build and test (${{ matrix.platform }})
-    needs: fmt
+    needs: [changes, fmt]
+    if: |
+      !cancelled() && needs.changes.outputs.lib == 'true' &&
+      (needs.fmt.result == 'success' || needs.fmt.result == 'skipped')
     runs-on: ${{ matrix.runs_on }}
     strategy:
       fail-fast: false
@@ -92,13 +138,42 @@ jobs:
         if: matrix.upstream
         run: zig build test-upstream
 
+  examples:
+    name: Examples (${{ matrix.platform }})
+    needs: [changes, fmt]
+    if: |
+      !cancelled() && needs.changes.outputs.examples == 'true' &&
+      (needs.fmt.result == 'success' || needs.fmt.result == 'skipped')
+    runs-on: ${{ matrix.runs_on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux x86_64
+            runs_on: ubuntu-latest
+            ppocrv6: true
+          - platform: macOS arm64
+            runs_on: macos-latest
+            ppocrv6: false
+          - platform: windows x86_64
+            runs_on: windows-latest
+            ppocrv6: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.1
+
       - name: Check example package contract
         working-directory: examples/relu
         shell: bash
         run: zig build run
 
       - name: Run ppocrv6 example
-        if: matrix.platform == 'linux x86_64'
+        if: matrix.ppocrv6
         working-directory: examples/ppocrv6
         shell: bash
         run: |
@@ -109,7 +184,10 @@ jobs:
 
   cross:
     name: Cross build (${{ matrix.target }})
-    needs: fmt
+    needs: [changes, fmt]
+    if: |
+      !cancelled() && needs.changes.outputs.lib == 'true' &&
+      (needs.fmt.result == 'success' || needs.fmt.result == 'skipped')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -135,12 +213,25 @@ jobs:
 
   required:
     name: Build and test
-    needs: [test, cross]
+    needs: [changes, fmt, dispatch, test, examples, cross]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Require every target
+      - name: Require every selected target
+        shell: bash
         env:
+          CHANGES: ${{ needs.changes.result }}
+          FMT: ${{ needs.fmt.result }}
+          DISPATCH: ${{ needs.dispatch.result }}
           TEST: ${{ needs.test.result }}
+          EXAMPLES: ${{ needs.examples.result }}
           CROSS: ${{ needs.cross.result }}
-        run: test "$TEST" = "success" && test "$CROSS" = "success"
+        run: |
+          failed=0
+          for result in "$CHANGES" "$FMT" "$DISPATCH" "$TEST" "$EXAMPLES" "$CROSS"; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "job result: $result"; failed=1 ;;
+            esac
+          done
+          exit "$failed"
