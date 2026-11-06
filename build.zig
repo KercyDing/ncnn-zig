@@ -79,7 +79,6 @@ pub fn build(b: *std.Build) !void {
 
     const lib = b.addLibrary(.{
         .name = "ncnn",
-        .linkage = options.linkage,
         .root_module = mod,
     });
 
@@ -198,10 +197,7 @@ pub fn build(b: *std.Build) !void {
         try flags.append(b.allocator, "-pthread");
     }
 
-    switch (options.linkage) {
-        .static => try flags.append(b.allocator, "-DNCNN_STATIC_DEFINE"),
-        .dynamic => try flags.append(b.allocator, "-DNCNN_BUILDING_LIBRARY"),
-    }
+    try flags.append(b.allocator, "-DNCNN_STATIC_DEFINE");
 
     // Expand `#pragma omp`; ncnn's simpleomp runtime provides the symbols.
     if (openmp) try flags.append(b.allocator, "-fopenmp");
@@ -393,7 +389,7 @@ pub fn build(b: *std.Build) !void {
     bindings.addConfigHeader(platform);
     bindings.addIncludePath(generated.getDirectory());
     bindings.addIncludePath(src_dir);
-    if (options.linkage == .static) bindings.defineCMacro("NCNN_STATIC_DEFINE", null);
+    bindings.defineCMacro("NCNN_STATIC_DEFINE", null);
     bindings.linkLibrary(lib);
 
     const ncnn_c = b.addModule("ncnn_c", .{

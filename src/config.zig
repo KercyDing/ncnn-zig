@@ -45,8 +45,6 @@ pub fn parseIsaSet(comptime E: type, spec: []const u8) error{InvalidIsa}!std.Enu
 }
 
 pub const Options = struct {
-    linkage: std.builtin.LinkMode = .static,
-
     // Feature switches mirroring upstream CMake options of the same name.
     stdio: bool = true,
     string: bool = true,
@@ -94,7 +92,6 @@ pub const Options = struct {
 
     pub fn fromBuild(b: *std.Build) Options {
         var o: Options = .{};
-        o.linkage = b.option(std.builtin.LinkMode, "linkage", "Build ncnn as a static or shared library") orelse o.linkage;
         inline for (.{
             "stdio",        "string",            "validation", "threads",      "pixel",  "pixel_rotate", "pixel_affine",   "pixel_drawing", "batch",
             "c_api",        "platform_api",      "int8",       "weight_quant", "bf16",   "force_inline", "simpleocv",      "openmp",        "simplestl",

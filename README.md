@@ -31,6 +31,9 @@ const ncnn_dep = b.dependency("ncnn", .{
 exe.root_module.linkLibrary(ncnn_dep.artifact("ncnn"));
 ```
 
+ncnn is always linked statically, producing a single self-contained binary.
+Shared-library builds are not supported.
+
 The package also exports a Zig module named `ncnn`:
 
 ```zig
@@ -73,7 +76,6 @@ as `-D<name>`.
 
 | Option | Default | |
 | --- | --- | --- |
-| `linkage` | `static` | `static` or `dynamic` |
 | `stdio`, `string`, `validation` | `true` | file loading, type names, param validation |
 | `threads` | `true` | thread pool |
 | `pixel`, `pixel_rotate`, `pixel_affine`, `pixel_drawing` | `true` | image helpers |
@@ -106,7 +108,6 @@ between the selected ones at runtime.
 const ncnn_dep = b.dependency("ncnn", .{
     .target = target,
     .optimize = optimize,
-    .linkage = .dynamic,
     .pixel = false,
     .x86_isa = "avx,avx2,avx512",
     .arm_isa = "asimdhp,asimddp,asimdfhm,bf16",
