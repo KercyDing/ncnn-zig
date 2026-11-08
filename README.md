@@ -1,4 +1,4 @@
-# ncnn.zig
+# ncnn-zig
 
 Zig wrapper for [ncnn](https://github.com/Tencent/ncnn)'s standalone
 [C API](https://github.com/Tencent/ncnn/blob/master/src/c_api.h).
@@ -18,13 +18,13 @@ Zig wrapper for [ncnn](https://github.com/Tencent/ncnn)'s standalone
 Add the package:
 
 ```bash
-zig fetch --save=ncnn git+https://github.com/kercyding/ncnn.zig#main
+zig fetch --save git+https://github.com/kercyding/ncnn-zig#main
 ```
 
 Link it from `build.zig`:
 
 ```zig
-const ncnn_dep = b.dependency("ncnn", .{
+const ncnn_dep = b.dependency("ncnn_zig", .{
     .target = target,
     .optimize = optimize,
 });
@@ -105,7 +105,7 @@ between the selected ones at runtime.
 — including `arm_isa = "off"`.
 
 ```zig
-const ncnn_dep = b.dependency("ncnn", .{
+const ncnn_dep = b.dependency("ncnn_zig", .{
     .target = target,
     .optimize = optimize,
     .pixel = false,

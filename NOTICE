@@ -1,4 +1,4 @@
-ncnn.zig
+ncnn-zig
 
 The build integration and Zig wrapper in this repository are licensed under
 the MIT License; see LICENSE.

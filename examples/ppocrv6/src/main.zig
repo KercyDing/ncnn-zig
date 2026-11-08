@@ -2,7 +2,7 @@
 //!
 //! This example intentionally covers only the recognition model: it runs a
 //! built-in sample text line, not a full page. Detection is left out so the
-//! example stays small and focused on exercising the ncnn.zig bindings.
+//! example stays small and focused on exercising the ncnn-zig bindings.
 
 const std = @import("std");
 const ncnn = @import("ncnn");

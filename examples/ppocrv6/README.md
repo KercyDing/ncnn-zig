@@ -1,6 +1,6 @@
 # PP-OCRv6 text-line recognition
 
-Small consumer example for `ncnn.zig`: recognizes one cropped text line with
+Small consumer example for `ncnn-zig`: recognizes one cropped text line with
 PP-OCRv6 tiny and prints the text. The model, weights, CTC dictionary and a
 sample text line are embedded in the binary, so there is nothing to download or
 place on disk.
