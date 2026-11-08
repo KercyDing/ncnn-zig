@@ -107,7 +107,6 @@ test "owning wrappers move" {
     var moved_extractor = extractor.move();
     defer moved_extractor.deinit();
     try std.testing.expect(extractor.raw() == null);
-
 }
 
 test "paramdict round trip" {
@@ -271,6 +270,16 @@ test "datareader param" {
     try std.testing.expectEqual(@as(i32, 0), try net.inputIndex(0));
     try std.testing.expectEqual(@as(i32, 1), try net.outputIndex(0));
     try std.testing.expectError(error.IndexOutOfBounds, net.inputIndex(1));
+}
+
+test "extract missing output fails" {
+    var net = try ncnn.Net.init();
+    defer net.deinit();
+    try net.loadParamMemory(param);
+
+    var extractor = try net.createExtractor();
+    defer extractor.deinit();
+    try std.testing.expectError(error.ExtractFailed, extractor.extract("missing"));
 }
 
 test "allocator option" {
