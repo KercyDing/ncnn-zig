@@ -61,6 +61,55 @@ test "mat channels" {
     try std.testing.expectError(error.IndexOutOfBounds, mat.channelFloat(2));
 }
 
+test "owning wrappers move" {
+    var source = try ncnn.Mat.fromSlice1d(&.{ 1, 2, 3 });
+    var moved = source.move();
+    defer moved.deinit();
+
+    try std.testing.expect(source.raw() == null);
+    try std.testing.expectEqualSlices(f32, &.{ 1, 2, 3 }, try moved.dataFloat());
+
+    var copy = try moved.clone();
+    defer copy.deinit();
+    (try copy.dataFloat())[0] = 9;
+    try std.testing.expectEqual(@as(f32, 1), (try moved.dataFloat())[0]);
+    var option = try ncnn.Option.init();
+    var moved_option = option.move();
+    defer moved_option.deinit();
+    try std.testing.expect(option.raw() == null);
+
+    var allocator = try ncnn.Allocator.initPool();
+    var moved_allocator = allocator.move();
+    defer moved_allocator.deinit();
+    try std.testing.expect(allocator.raw() == null);
+
+    var layer = try ncnn.Layer.init();
+    var moved_layer = layer.move();
+    defer moved_layer.deinit();
+    try std.testing.expect(layer.raw() == null);
+
+    var params = try ncnn.ParamDict.init();
+    var moved_params = params.move();
+    defer moved_params.deinit();
+    try std.testing.expect(params.raw() == null);
+
+    var reader = try ncnn.DataReader.init();
+    var moved_reader = reader.move();
+    defer moved_reader.deinit();
+    try std.testing.expect(reader.raw() == null);
+
+    var net = try ncnn.Net.init();
+    var moved_net = net.move();
+    defer moved_net.deinit();
+    try std.testing.expect(net.raw() == null);
+
+    var extractor = try moved_net.createExtractor();
+    var moved_extractor = extractor.move();
+    defer moved_extractor.deinit();
+    try std.testing.expect(extractor.raw() == null);
+
+}
+
 test "paramdict round trip" {
     var pd = try ncnn.ParamDict.init();
     defer pd.deinit();

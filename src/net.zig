@@ -230,6 +230,13 @@ pub const Extractor = struct {
         self.handle = null;
     }
 
+    /// Transfers ownership and clears the source wrapper.
+    pub fn move(self: *Extractor) Extractor {
+        const result = self.*;
+        self.handle = null;
+        return result;
+    }
+
     /// Returns the underlying C handle.
     pub fn raw(self: Extractor) c.ncnn_extractor_t {
         return self.handle;
