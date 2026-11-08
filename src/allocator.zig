@@ -23,6 +23,13 @@ pub const Allocator = struct {
         self.handle = null;
     }
 
+    /// Transfers ownership and clears the source wrapper.
+    pub fn move(self: *Allocator) Allocator {
+        const result = self.*;
+        self.handle = null;
+        return result;
+    }
+
     /// Returns the underlying C handle.
     pub fn raw(self: Allocator) c.ncnn_allocator_t {
         return self.handle;

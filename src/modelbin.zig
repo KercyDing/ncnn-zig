@@ -22,6 +22,13 @@ pub const ModelBin = struct {
         self.handle = null;
     }
 
+    /// Transfers ownership and clears the source wrapper.
+    pub fn move(self: *ModelBin) ModelBin {
+        const result = self.*;
+        self.handle = null;
+        return result;
+    }
+
     /// Returns the underlying C handle.
     pub fn raw(self: ModelBin) c.ncnn_modelbin_t {
         return self.handle;

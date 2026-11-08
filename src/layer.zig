@@ -73,6 +73,13 @@ pub const Layer = struct {
         self.handle = null;
     }
 
+    /// Transfers ownership and clears the source wrapper.
+    pub fn move(self: *Layer) Layer {
+        const result = self.*;
+        self.handle = null;
+        return result;
+    }
+
     /// Returns the underlying C handle.
     pub fn raw(self: Layer) c.ncnn_layer_t {
         return self.handle;

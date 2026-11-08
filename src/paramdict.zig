@@ -19,6 +19,13 @@ pub const ParamDict = struct {
         self.handle = null;
     }
 
+    /// Transfers ownership and clears the source wrapper.
+    pub fn move(self: *ParamDict) ParamDict {
+        const result = self.*;
+        self.handle = null;
+        return result;
+    }
+
     /// Returns the underlying C handle.
     pub fn raw(self: ParamDict) c.ncnn_paramdict_t {
         return self.handle;

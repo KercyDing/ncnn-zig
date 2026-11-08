@@ -22,6 +22,13 @@ pub const Option = struct {
         self.handle = null;
     }
 
+    /// Transfers ownership and clears the source wrapper.
+    pub fn move(self: *Option) Option {
+        const result = self.*;
+        self.handle = null;
+        return result;
+    }
+
     /// Returns the underlying C handle.
     pub fn raw(self: Option) c.ncnn_option_t {
         return self.handle;

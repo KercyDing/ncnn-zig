@@ -47,6 +47,14 @@ pub const DataReader = struct {
         self.memory_cursor = null;
     }
 
+    /// Transfers ownership and clears the source wrapper.
+    pub fn move(self: *DataReader) DataReader {
+        const result = self.*;
+        self.handle = null;
+        self.memory_cursor = null;
+        return result;
+    }
+
     /// Returns the underlying C handle.
     pub fn raw(self: DataReader) c.ncnn_datareader_t {
         return self.handle;

@@ -24,6 +24,13 @@ pub const Net = struct {
         self.handle = null;
     }
 
+    /// Transfers ownership and clears the source wrapper.
+    pub fn move(self: *Net) Net {
+        const result = self.*;
+        self.handle = null;
+        return result;
+    }
+
     /// Returns the underlying C handle.
     pub fn raw(self: Net) c.ncnn_net_t {
         return self.handle;

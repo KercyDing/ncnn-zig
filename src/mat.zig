@@ -354,6 +354,13 @@ pub const Mat = struct {
         self.handle = null;
     }
 
+    /// Transfers ownership and clears the source wrapper.
+    pub fn move(self: *Mat) Mat {
+        const result = self.*;
+        self.handle = null;
+        return result;
+    }
+
     /// Returns the underlying C handle.
     pub fn raw(self: Mat) c.ncnn_mat_t {
         return self.handle;
