@@ -86,7 +86,6 @@ as `-D<name>`.
 | `benchmark`, `coverage` | `false` | upstream debug switches |
 | `openmp` | `true` | parallel loops via ncnn's simpleomp runtime (POSIX, windows-gnu; requires `threads`) |
 | `simpleocv`, `simplestl`, `simplemath` | `false` | minimal stubs |
-| `winxp` | `false` | Windows XP compatibility |
 | `disable_rtti`, `disable_exception` | `false` | build without RTTI/exceptions |
 | `runtime_x86` | `true` | x86 AVX/AVX512 dispatch (x86 only) |
 | `x86_isa` | `all` | x86 subset: `all`, `off`, or comma-separated ISAs (see below) |

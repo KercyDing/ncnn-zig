@@ -67,7 +67,6 @@ pub const Options = struct {
     openmp: bool = true,
     simplestl: bool = false,
     simplemath: bool = false,
-    winxp: bool = false,
 
     benchmark: bool = false,
     coverage: bool = false,
@@ -97,10 +96,10 @@ pub const Options = struct {
     pub fn fromBuild(b: *std.Build) Options {
         var o: Options = .{};
         inline for (.{
-            "stdio",        "string",            "validation", "threads",      "pixel",  "pixel_rotate", "pixel_affine",   "pixel_drawing", "batch",
-            "c_api",        "platform_api",      "int8",       "weight_quant", "bf16",   "force_inline", "simpleocv",      "openmp",        "simplestl",
-            "simplemath",   "winxp",             "benchmark",  "coverage",     "vulkan", "simplevk",     "system_glslang", "runtime_x86",   "gnu_inline_asm",
-            "disable_rtti", "disable_exception",
+            "stdio",             "string",       "validation", "threads",      "pixel",    "pixel_rotate",   "pixel_affine", "pixel_drawing",  "batch",
+            "c_api",             "platform_api", "int8",       "weight_quant", "bf16",     "force_inline",   "simpleocv",    "openmp",         "simplestl",
+            "simplemath",        "benchmark",    "coverage",   "vulkan",       "simplevk", "system_glslang", "runtime_x86",  "gnu_inline_asm", "disable_rtti",
+            "disable_exception",
         }) |name| {
             @field(o, name) = b.option(bool, name, "ncnn " ++ name) orelse @field(o, name);
         }
@@ -201,7 +200,9 @@ pub fn platformValues(
         .NCNN_C_API = o.c_api,
         .NCNN_PLATFORM_API = o.platform_api,
         .NCNN_BATCH = o.batch,
-        .NCNN_WINXP = o.winxp,
+        // Windows XP is unsupported: the windows-gnu simpleomp shim uses
+        // InitOnceExecuteOnce, which requires Vista or newer.
+        .NCNN_WINXP = false,
         .NCNN_PIXEL = o.pixel,
         .NCNN_PIXEL_ROTATE = o.pixel_rotate,
         .NCNN_PIXEL_AFFINE = o.pixel_affine,
