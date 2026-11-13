@@ -132,14 +132,16 @@ pub const layers = [_]Layer{
     .{ .name = "RotaryEmbed" },
 };
 
-/// Layers that must be compiled together. Covers link-time symbol references
-/// and layers created at runtime through `create_layer()`. Enabling `layer`
-/// also enables every entry in `needs`.
-pub const dependencies = [_]struct { layer: []const u8, needs: []const []const u8 }{
-    // `convolution_x86.cpp` calls the int8 GEMM utilities defined in
-    // `gemm_x86.cpp`; without the Gemm TU the final link fails. The generic
-    // 1x1 path also creates an InnerProduct layer at runtime.
-    .{ .layer = "Convolution", .needs = &.{ "Gemm", "InnerProduct" } },
+pub const Dependency = struct {
+    layer: []const u8,
+    needs: []const []const u8,
+};
+
+/// Layers created at runtime by another layer's implementation through
+/// `create_layer()`. Verified by scanning the upstream layer sources; see
+/// `tools/check_deps.zig`.
+pub const runtime_dependencies = [_]Dependency{
+    .{ .layer = "Convolution", .needs = &.{"InnerProduct"} },
     .{ .layer = "ConvolutionDepthWise", .needs = &.{"Convolution"} },
     .{ .layer = "Deconvolution", .needs = &.{"Gemm"} },
     .{ .layer = "DeconvolutionDepthWise", .needs = &.{"Deconvolution"} },
@@ -149,7 +151,14 @@ pub const dependencies = [_]struct { layer: []const u8, needs: []const []const u
     .{ .layer = "MultiHeadAttention", .needs = &.{ "Gemm", "Softmax" } },
     .{ .layer = "SDPA", .needs = &.{ "Gemm", "Softmax" } },
     .{ .layer = "YoloDetectionOutput", .needs = &.{"Softmax"} },
-    .{ .layer = "Yolov3DetectionOutput", .needs = &.{"Softmax"} },
+};
+
+/// Layers whose translation units provide symbols referenced by another
+/// layer's object. Verified by inspecting link-time symbols.
+pub const link_dependencies = [_]Dependency{
+    // `convolution_x86.cpp` calls the int8 GEMM utilities defined in
+    // `gemm_x86.cpp`; without the Gemm TU the final link fails.
+    .{ .layer = "Convolution", .needs = &.{"Gemm"} },
 };
 
 /// Always compiled, relative to the upstream `src` directory.

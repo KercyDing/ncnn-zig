@@ -184,6 +184,7 @@ zig build               # compile the library
 zig build bindings      # generate and type-check the wrapper
 zig build test          # wrapper smoke test
 zig build test-upstream # upstream layer tests (kernels vs naive reference)
+zig build check-deps    # verify runtime layer dependencies against upstream sources
 ```
 
 ncnn's C++ is built with `sanitize_c = .off`. Upstream relies on type punning

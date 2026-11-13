@@ -19,6 +19,7 @@
         "cpp",
         "src",
         "test",
+        "tools",
         "LICENSE",
         "NOTICE",
         "README.md",

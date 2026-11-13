@@ -33,6 +33,7 @@ jobs:
               - 'build.zig.zon'
               - 'src/**'
               - 'test/**'
+              - 'tools/**'
               - '.github/workflows/check.yml'
             examples:
               - 'examples/**/*.zig'
@@ -78,6 +79,9 @@ jobs:
 
       - name: Baseline only
         run: zig build test -Dx86_isa=off
+
+      - name: Runtime layer dependencies
+        run: zig build check-deps
 
       - name: AVX2 subset
         run: zig build test-upstream -Dx86_isa=avx,avx2

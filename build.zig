@@ -510,6 +510,27 @@ pub fn build(b: *std.Build) !void {
         const run_upstream_test = b.addRunArtifact(upstream_test_exe);
         upstream_test_step.dependOn(&run_upstream_test.step);
     }
+
+    {
+        const check_mod = b.createModule(.{
+            .root_source_file = b.path("tools/check_deps.zig"),
+            .target = b.graph.host,
+            .optimize = .Debug,
+        });
+        check_mod.addImport("ncnn_sources", b.createModule(.{
+            .root_source_file = b.path("src/sources.zig"),
+            .target = b.graph.host,
+            .optimize = .Debug,
+        }));
+        const check_exe = b.addExecutable(.{
+            .name = "check-deps",
+            .root_module = check_mod,
+        });
+        const run_check = b.addRunArtifact(check_exe);
+        run_check.setCwd(upstream.path(""));
+        const check_step = b.step("check-deps", "Verify runtime layer dependencies against upstream sources");
+        check_step.dependOn(&run_check.step);
+    }
 }
 
 /// Maps a Zig CPU architecture to ncnn's `src/layer/<arch>` directory.
@@ -568,20 +589,27 @@ fn resolveLayerSelection(allocator: std.mem.Allocator, spec: []const u8) ![]bool
     }
 
     // Pull in translation units that provide symbols referenced by enabled
-    // layers; a static archive cannot resolve them on its own.
+    // layers, and layers created at runtime. A static archive cannot resolve
+    // the former, and ncnn does not null-check the latter.
+    const groups: [2][]const sources.Dependency = .{
+        &sources.runtime_dependencies,
+        &sources.link_dependencies,
+    };
     var changed = true;
     while (changed) {
         changed = false;
-        for (sources.dependencies) |dep| {
-            const index = findLayer(dep.layer) orelse
-                fail("layers: unknown dependency '{s}'", .{dep.layer});
-            if (!enabled[index]) continue;
-            for (dep.needs) |name| {
-                const need = findLayer(name) orelse
-                    fail("layers: unknown dependency '{s}'", .{name});
-                if (!enabled[need]) {
-                    enabled[need] = true;
-                    changed = true;
+        for (groups) |group| {
+            for (group) |dep| {
+                const index = findLayer(dep.layer) orelse
+                    fail("layers: unknown dependency '{s}'", .{dep.layer});
+                if (!enabled[index]) continue;
+                for (dep.needs) |name| {
+                    const need = findLayer(name) orelse
+                        fail("layers: unknown dependency '{s}'", .{name});
+                    if (!enabled[need]) {
+                        enabled[need] = true;
+                        changed = true;
+                    }
                 }
             }
         }
