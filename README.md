@@ -1,207 +1,177 @@
 # ncnn-zig
 
-Zig wrapper for [ncnn](https://github.com/Tencent/ncnn)'s standalone
-[C API](https://github.com/Tencent/ncnn/blob/master/src/c_api.h).
+Zig wrapper and build integration for [ncnn](https://github.com/Tencent/ncnn).
 
-- Builds from source. No CMake, no prebuilt binaries.
-- The upstream revision is pinned in `build.zig.zon`.
-- Upstream sources are not vendored here.
-- Requires Zig 0.17.
+The package:
+
+- fetches a pinned ncnn source revision at build time;
+- builds ncnn statically from source;
+- exposes the generated C API as `ncnn.c`;
+- exposes a higher-level Zig module as `ncnn`.
+
+Requires Zig 0.17. ncnn is not vendored, and prebuilt or shared-library builds
+are not provided.
 
 > [!WARNING]
-> The Zig wrapper is AI-assisted and only partially verified. The shipped
-> build and tests pass, but most wrapper functions, options and quantized
-> paths have not been exercised. Treat it as experimental.
+> The wrapper is experimental. The build, smoke tests, and selected upstream
+> tests pass, but not every ncnn API or configuration is covered.
 
-## Usage
+## Use
 
-Add the package:
+Add the dependency:
 
 ```bash
 zig fetch --save git+https://github.com/kercyding/ncnn-zig#v0.1.0
 ```
 
-Link it from `build.zig`:
+Link the static library and import the Zig module:
 
 ```zig
 const ncnn_dep = b.dependency("ncnn_zig", .{
     .target = target,
     .optimize = optimize,
 });
+
 exe.root_module.linkLibrary(ncnn_dep.artifact("ncnn"));
-```
-
-ncnn is always linked statically, producing a single self-contained binary.
-Shared-library builds are not supported.
-
-### Trim layers from a model
-
-`-Dlayers` accepts a comma-separated allowlist. See
-[`tools/README.md`](tools/README.md) for generating one from `.param` files.
-ncnn-zig still expands static dependencies such as `Convolution -> Gemm`
-automatically.
-
-The package also exports a Zig module named `ncnn`:
-
-```zig
 exe.root_module.addImport("ncnn", ncnn_dep.module("ncnn"));
 ```
 
-The module wraps `Net`, `Extractor`, `Mat`, `Option`, `ParamDict`, custom
-layers, data readers and allocators, plus pixel conversion and drawing
-helpers. It links the library for you.
+The Zig module covers the commonly used `Net`, `Extractor`, `Mat`, `Option`,
+`ParamDict`, data-reader, allocator, pixel, and drawing APIs. The generated
+raw C bindings remain available as `ncnn.c`.
+
+## What can be customized
+
+All options can be passed to `b.dependency(...)` or as `-D<name>`.
+
+### Target and binary
+
+Use Zig's normal `.target`, `.optimize`, and `.strip` options. ncnn is always
+linked statically into the final executable.
+
+### Compiled layers
+
+`layers` controls which layer translation units are compiled:
 
 ```zig
-const ncnn = @import("ncnn");
-
-var net = try ncnn.Net.init();
-defer net.deinit();
-try net.loadParamFile("model.param");
-try net.loadModelFile("model.bin");
-
-var extractor = try net.createExtractor();
-defer extractor.deinit();
-
-var input = try ncnn.Mat.fromSlice3d(224, 224, 3, pixels);
-defer input.deinit();
-try extractor.input("data", input);
-
-var output = try extractor.extract("prob");
-defer output.deinit();
+.layers = "Input,Convolution,ReLU,Pooling,Softmax",
 ```
 
-The raw C API, generated with
-[translate-c](https://codeberg.org/ziglang/translate-c), stays available as
-`ncnn.c`.
+It accepts:
 
-Headers (`platform.h`, `c_api.h`, `layer/…`) are installed with the library.
+- `default`: upstream's default layer set;
+- `all`: every layer known to ncnn-zig;
+- a comma-separated allowlist.
 
-## Build options
+The allowlist keeps ncnn's original layer IDs. Omitted layers therefore remain
+compatible with existing `.param` files, but loading a model that needs an
+omitted layer fails.
 
-Options mirror the upstream CMake switches. Pass them to `b.dependency(...)` or
-as `-D<name>`.
+Static runtime and link dependencies are added automatically. For example,
+`Convolution` may pull in `Gemm`. See [`tools/README.md`](tools/README.md) for
+the layer tool details; use [`tools/layers.py`](tools/layers.py) to generate a
+suggested list from one or more `.param` files:
 
-| Option | Default | |
-| --- | --- | --- |
-| `stdio`, `string`, `validation` | `true` | file loading, type names, param validation |
-| `threads` | `true` | thread pool |
-| `pixel`, `pixel_rotate`, `pixel_affine`, `pixel_drawing` | `true` | image helpers |
-| `batch` | `true` | batch inference |
-| `c_api`, `platform_api` | `true` | C API, platform helpers |
-| `int8`, `weight_quant`, `bf16` | `true` | quantized paths |
-| `force_inline` | `true` | force-inline hot helpers |
-| `benchmark`, `coverage` | `false` | upstream debug switches |
-| `openmp` | `true` | parallel loops via ncnn's simpleomp runtime (POSIX, windows-gnu; requires `threads`) |
-| `simpleocv`, `simplestl`, `simplemath` | `false` | minimal stubs |
-| `disable_rtti`, `disable_exception` | `false` | build without RTTI/exceptions |
-| `runtime_x86` | `true` | x86 AVX/AVX512 dispatch (x86 only) |
-| `x86_isa` | `all` | x86 subset: `all`, `off`, or comma-separated ISAs (see below) |
-| `arm_isa` | `all` | aarch64 subset: `all`, `off`, or comma-separated ISAs (see below) |
-| `layers` | `default` | layer allowlist: `default`, `all`, or comma-separated names |
+```bash
+python3 tools/layers.py model.param
+python3 tools/layers.py models/*.param
+```
 
-`x86_isa` accepts `avx`, `avx2`, `fma`, `fma4`, `xop`, `f16c`, `avxvnni`,
-`avxvnniint8`, `avxneconvert`, `avx512`, `avx512vnni`, `avx512bf16`.
-`arm_isa` accepts `asimdhp`, `asimddp`, `asimdfhm`, `bf16`, `i8mm`
-(`vfpv4` is always built on aarch64). Selecting a subset skips the other
-variant sources at build time, which shrinks the binary; ncnn still dispatches
-between the selected ones at runtime.
+The result is a build suggestion, not a replacement for testing the model.
 
-`runtime_x86` only controls x86; on aarch64 use `arm_isa` instead
-(`-Darm_isa=off` disables dispatch). The `bf16` storage feature defaults to
-`true`, so an aarch64 subset must include `bf16` unless `.bf16 = false` is set
-— including `arm_isa = "off"`.
+### CPU instruction sets
 
-`layers` trims what gets compiled. `default` keeps upstream's selection,
-`all` enables every known layer (including `ArgMax` and `SPP`, which upstream
-leaves off), and a comma-separated list compiles exactly those layers.
+On x86:
 
 ```zig
-const ncnn_dep = b.dependency("ncnn_zig", .{
-    .target = target,
-    .optimize = optimize,
-    .layers = "Input,Convolution,ReLU,Pooling,Softmax",
-});
+.runtime_x86 = true,
+.x86_isa = "avx,avx2,avx512",
 ```
 
-Filtering never renumbers `layer_type_enum.h`, so existing `.param` files stay
-compatible; omitted layers have no creator, and loading a model that uses one
-fails at param load. Link-time dependencies are pulled in automatically:
-`Convolution` enables `Gemm` because `convolution_x86.cpp` calls GEMM's int8
-kernels. `Mat` helpers create layers internally (`Packing`, `Flatten`,
-`Padding`, `Crop`, `Interp`, `Cast`, `Bias`, `Scale`), so keep those if the
-wrapper's Mat and pixel utilities are used. `zig build test` needs `Input`,
-`ReLU`, `Packing`, `Flatten`, `Padding`, `Cast`, `Bias` and `Scale`.
+On AArch64:
 
 ```zig
-const ncnn_dep = b.dependency("ncnn_zig", .{
-    .target = target,
-    .optimize = optimize,
-    .pixel = false,
-    .x86_isa = "avx,avx2,avx512",
-    .arm_isa = "asimdhp,asimddp,asimdfhm,bf16",
-});
+.arm_isa = "asimdhp,asimddp,asimdfhm,bf16",
 ```
 
-The same values are accepted on the command line, e.g.
-`zig build -Dx86_isa=avx,avx2`.
+Use `all`, `off`, or a comma-separated subset. Selected variants are dispatched
+at runtime. The base ncnn sources still use the target architecture baseline,
+not `-march=native`.
 
-## Status
+### ncnn features
 
-- Built for the architecture baseline: `x86_64`/`i386` + SSE2, `aarch64` NEON.
-- This matches how upstream compiles its base sources.
-- Optimized `src/layer/x86` and `src/layer/arm` kernels are included when they
-  exist.
-- x86 runtime dispatch is built: AVX, FMA, F16C, AVX2, AVX512, AVX512VNNI,
-  AVX512BF16, FMA4, XOP, AVX-VNNI, AVX-VNNI-INT8 and AVX-NE-CONVERT variants
-  are generated from the upstream sources and picked by ncnn's CPU check.
-- ARM: 32-bit builds target ARMv7 NEON/VFPv4; AArch64 also compiles FP16,
-  dotprod, fp16fml, bf16 and i8mm variants for runtime dispatch.
-- Not built: AVX512-FP16 and AVX-VNNI-INT16; upstream ships no kernel sources
-  for either.
-- Vulkan is not supported. ncnn builds its compute shaders through glslang,
-  which is a git submodule and not part of the upstream release tarball used
-  here. `-Dvulkan=true` is rejected at configure time.
-- Parallel loops use ncnn's simpleomp runtime, so no external OpenMP library
-  is needed and `Option.setNumThreads` takes effect. On windows-gnu the
-  runtime's single `pthread_once` call is generated as a native
-  `InitOnceExecuteOnce`, so Windows GNU builds are parallel without
-  winpthreads; the MSVC ABI still runs the loops serially.
+The following upstream features can be enabled or disabled:
 
-Verified:
+```zig
+.stdio = true,
+.string = true,
+.validation = true,
+.threads = true,
+.pixel = true,
+.pixel_rotate = true,
+.pixel_affine = true,
+.pixel_drawing = true,
+.batch = true,
+.c_api = true,
+.platform_api = true,
+.int8 = true,
+.weight_quant = true,
+.bf16 = true,
+```
 
-- `zig build` on Linux, plus compile-only cross builds for
-  `x86_64-windows-gnu`, `aarch64-macos`, `aarch64-linux-gnu` and
-  `arm-linux-gnueabihf`.
-- `zig build test`: version match, options, `Input -> ReLU`, custom layer,
-  data reader loading, pooled allocators, Mat layout/reshape/packing,
-  ParamDict round trip, pixel round trip, drawing, and a check that simpleomp
-  dispatches to multiple OS threads when more than one core is available.
-- `zig build test-upstream`: six upstream layer tests against this library.
+Disable a feature only when the application does not use the corresponding
+API or model path. For example, disabling `int8` removes quantized inference
+support; disabling `pixel` removes pixel conversion support from the generated
+C API. The Zig wrapper does not hide these configuration constraints.
 
-Everything else in the wrapper is unverified.
+Other build controls include:
 
-A runnable consumer example lives in [`examples/relu`](examples/relu), and a
-PP-OCRv6 text-line recognition demo lives in
-[`examples/ppocrv6`](examples/ppocrv6).
+- `force_inline`;
+- `disable_rtti` and `disable_exception`;
+- `openmp` and ncnn's built-in `simpleomp` runtime;
+- `simpleocv`, `simplestl`, and `simplemath`;
+- `benchmark` and `coverage`.
+
+## What is not covered
+
+This package does not provide:
+
+- Vulkan support. `-Dvulkan=true` is rejected because the required shader
+  toolchain is not part of the pinned upstream source package;
+- prebuilt `.a`/`.lib` artifacts or shared-library builds;
+- model downloading, model conversion, preprocessing, postprocessing, or a
+  model zoo;
+- a complete high-level Zig abstraction over every ncnn API;
+- automatic proof that a generated `layers` list is sufficient for every
+  runtime code path;
+- complete coverage of all ncnn options, architectures, and quantized paths.
+
+Custom layers can still be implemented and registered by the application
+through ncnn's runtime custom-layer API. They are not compiled by the
+`layers` allowlist unless their implementation is supplied by the application.
+
+Vulkan, unsupported upstream options, and model-specific behavior must be
+handled by the application or by extending the build integration.
 
 ## Development
 
 ```bash
-zig build               # compile the library
+zig build               # build the static library
 zig build bindings      # generate and type-check the wrapper
-zig build test          # wrapper smoke test
-zig build test-upstream # upstream layer tests (kernels vs naive reference)
-zig build check-deps    # verify runtime layer dependencies against upstream sources
+zig build test          # wrapper smoke tests
+zig build test-upstream # selected upstream layer tests
+zig build check-deps    # check layer dependencies against upstream sources
 ```
 
-ncnn's C++ is built with `sanitize_c = .off`. Upstream relies on type punning
-and pointer arithmetic that UBSan rejects.
+The upstream revision is pinned in `build.zig.zon`. ncnn C++ is compiled with
+`sanitize_c = .off` because upstream uses type punning and pointer arithmetic
+that UBSan rejects.
 
 ## License
 
-The build integration and the Zig wrapper are licensed under the
+The build integration and Zig wrapper are licensed under the
 [MIT License](LICENSE).
 
-ncnn is fetched from upstream at build time and is licensed under the
+ncnn is fetched from upstream and is licensed under the
 [BSD 3-Clause License](https://github.com/Tencent/ncnn/blob/master/LICENSE.txt).
-Details in [NOTICE](NOTICE).
+See [NOTICE](NOTICE).
