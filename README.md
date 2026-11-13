@@ -41,6 +41,9 @@ Shared-library builds are not supported.
 
 ```bash
 python3 tools/layers.py model.param
+
+# union several models or profiles:
+python3 tools/layers.py det.param rec.param cls.param
 ```
 
 It prints a `.layers = "..."` line and notes about fused activations, custom

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Suggest an ncnn-zig `.layers` allowlist from an ncnn `.param` file.
+"""Suggest an ncnn-zig `.layers` allowlist from ncnn `.param` files.
 
-The suggestion is meant to run, not to be minimal: it includes the wrapper
-helper layers and fused activation layers. Remove layers you do not need and
-test the model. The ncnn-zig build still expands static dependencies such as
-Convolution -> Gemm automatically.
+Pass one file or several; the result is the union. The suggestion is meant to
+run, not to be minimal: it includes the wrapper helper layers and fused
+activation layers. Remove layers you do not need and test the models. The
+ncnn-zig build still expands static dependencies such as Convolution -> Gemm
+automatically.
 """
 
 from __future__ import annotations
@@ -121,9 +122,11 @@ def parse_param(text: str) -> tuple[list[str], set[str]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Print a runnable ncnn-zig .layers suggestion from a .param file."
+        description="Print a runnable ncnn-zig .layers suggestion from one or more .param files."
     )
-    parser.add_argument("param", type=Path, help="path to model.param")
+    parser.add_argument(
+        "params", type=Path, nargs="+", help="one or more model.param files"
+    )
     parser.add_argument(
         "--sources",
         type=Path,
@@ -140,15 +143,24 @@ def main() -> int:
     try:
         known = known_layers(args.sources)
         known_set = set(known)
-        layers, activations = parse_param(args.param.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as err:
+        all_layers: list[str] = []
+        all_activations: set[str] = set()
+        for path in args.params:
+            try:
+                layers, activations = parse_param(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as err:
+                print(f"layers.py: {path}: {err}", file=sys.stderr)
+                return 1
+            all_layers.extend(layers)
+            all_activations.update(activations)
+    except OSError as err:
         print(f"layers.py: {err}", file=sys.stderr)
         return 1
 
-    custom = [name for name in dict.fromkeys(layers) if name not in known_set]
-    model = [name for name in dict.fromkeys(layers) if name in known_set]
+    custom = [name for name in dict.fromkeys(all_layers) if name not in known_set]
+    model = [name for name in dict.fromkeys(all_layers) if name in known_set]
 
-    selected = set(model) | activations
+    selected = set(model) | all_activations
     if not args.minimal:
         selected.update(DEFAULT_HELPERS)
 
@@ -160,9 +172,9 @@ def main() -> int:
     ordered = [name for name in known if name in selected]
     print('.layers = "' + ",".join(ordered) + '",')
 
-    if activations:
+    if all_activations:
         print(
-            "# fused activations added: " + ", ".join(sorted(activations)),
+            "# fused activations added: " + ", ".join(sorted(all_activations)),
             file=sys.stderr,
         )
     if custom:
