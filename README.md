@@ -21,7 +21,7 @@ are not provided.
 Add the dependency:
 
 ```bash
-zig fetch --save git+https://github.com/kercyding/ncnn-zig#v0.1.0
+zig fetch --save git+https://github.com/kercyding/ncnn-zig#v0.2.0
 ```
 
 Link the static library and import the Zig module:
