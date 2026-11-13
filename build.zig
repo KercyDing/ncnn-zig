@@ -11,12 +11,18 @@ pub fn build(b: *std.Build) !void {
     const strip = b.option(bool, "strip", "Strip debug symbols") orelse false;
     const options = config.Options.fromBuild(b);
 
+    const prebuilt = b.option(std.Build.LazyPath, "prebuilt", "Use a prebuilt package (include/ and lib/)") orelse null;
+    if (prebuilt) |root| {
+        try buildPrebuilt(b, target, optimize, root);
+        return;
+    }
+
     if (options.vulkan) {
         std.log.err("vulkan support is not implemented yet", .{});
         std.process.exit(1);
     }
 
-    const upstream = b.dependency("ncnn", .{});
+    const upstream = b.lazyDependency("ncnn", .{}) orelse return;
     const src_dir = upstream.path("src");
     const t = target.result;
 
@@ -792,6 +798,67 @@ fn validateArmIsa(set: std.EnumSet(config.ArmIsa), bf16_feature: bool) void {
         fail("arm_isa: bf16/i8mm require asimddp and asimdfhm", .{});
     if (bf16_feature and !set.contains(.bf16))
         fail("arm_isa must include bf16 while bf16 is enabled; pass -Dbf16=false to drop bf16 support", .{});
+}
+
+fn buildPrebuilt(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.Optimize,
+    root: std.Build.LazyPath,
+) !void {
+    const t = target.result;
+    const include = root.path(b, "include");
+
+    const translate_c = b.dependency("translate_c", .{});
+    const Translator = @import("translate_c").Translator;
+    const bindings: Translator = .init(translate_c, .{
+        .name = "ncnn",
+        .c_source_file = include.path(b, "c_api.h"),
+        .target = target,
+        .optimize = optimize,
+        .warnings = .@"error",
+    });
+    bindings.run.addArg("-Wno-unknown-warning-option");
+    bindings.addIncludePath(include);
+    bindings.defineCMacro("NCNN_STATIC_DEFINE", null);
+
+    const ncnn_c = b.addModule("ncnn_c", .{
+        .root_source_file = bindings.output_file,
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+        .link_libcpp = true,
+    });
+    ncnn_c.addImport("c_builtins", translate_c.module("c_builtins"));
+    ncnn_c.addImport("helpers", translate_c.module("helpers"));
+
+    const lib = root.path(b, if (t.os.tag == .windows) "lib/ncnn.lib" else "lib/libncnn.a");
+    const ncnn = b.addModule("ncnn", .{
+        .root_source_file = b.path("src/ncnn.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+        .link_libcpp = true,
+        .imports = &.{.{ .name = "ncnn_c", .module = ncnn_c }},
+    });
+    ncnn.addObjectFile(lib);
+    if (t.os.tag != .windows) ncnn.linkSystemLibrary("pthread", .{});
+
+    const bindings_step = b.step("bindings", "Generate and type-check the Zig wrapper and its C bindings");
+    bindings_step.dependOn(&bindings.run.step);
+    bindings_step.dependOn(&b.addObject(.{ .name = "ncnn_bindings", .root_module = ncnn }).step);
+
+    const test_mod = b.createModule(.{
+        .root_source_file = b.path("test/smoke.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+        .link_libcpp = true,
+    });
+    test_mod.addImport("ncnn", ncnn);
+    const tests = b.addTest(.{ .root_module = test_mod });
+    const run_tests = b.addRunArtifact(tests);
+    b.step("test", "Run smoke tests").dependOn(&run_tests.step);
 }
 
 comptime {

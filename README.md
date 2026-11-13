@@ -9,8 +9,8 @@ The package:
 - exposes the generated C API as `ncnn.c`;
 - exposes a higher-level Zig module as `ncnn`.
 
-Requires Zig 0.17. ncnn is not vendored, and prebuilt or shared-library builds
-are not provided.
+Requires Zig 0.17. ncnn is not vendored. Prebuilt archives are not shipped,
+but `-Dprebuilt=<dir>` can consume one.
 
 > [!WARNING]
 > The wrapper is experimental. The build, smoke tests, and selected upstream
@@ -39,6 +39,24 @@ exe.root_module.addImport("ncnn", ncnn_dep.module("ncnn"));
 The Zig module covers the commonly used `Net`, `Extractor`, `Mat`, `Option`,
 `ParamDict`, data-reader, allocator, pixel, and drawing APIs. The generated
 raw C bindings remain available as `ncnn.c`.
+
+### Prebuilt library
+
+Point `prebuilt` at a directory containing `include/` and `lib/libncnn.a`
+(`lib/ncnn.lib` on Windows):
+
+```zig
+const ncnn_dep = b.dependency("ncnn_zig", .{
+    .target = target,
+    .optimize = optimize,
+    .prebuilt = .{ .cwd_relative = "/path/to/ncnn-prebuilt" },
+});
+```
+
+This skips the upstream build and generates the bindings from the supplied
+headers. The archive must match the target, Zig version, and ncnn options
+(`layers`, ISA set, `int8`, `weight_quant`); otherwise the generated headers
+and the linked library disagree.
 
 ## What can be customized
 
@@ -138,7 +156,8 @@ This package does not provide:
 
 - Vulkan support. `-Dvulkan=true` is rejected because the required shader
   toolchain is not part of the pinned upstream source package;
-- prebuilt `.a`/`.lib` artifacts or shared-library builds;
+- prebuilt `.a`/`.lib` artifacts or shared-library builds; `-Dprebuilt` only
+  consumes a directory you provide;
 - model downloading, model conversion, preprocessing, postprocessing, or a
   model zoo;
 - a complete high-level Zig abstraction over every ncnn API;
