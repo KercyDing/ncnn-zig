@@ -91,6 +91,7 @@ as `-D<name>`.
 | `runtime_x86` | `true` | x86 AVX/AVX512 dispatch (x86 only) |
 | `x86_isa` | `all` | x86 subset: `all`, `off`, or comma-separated ISAs (see below) |
 | `arm_isa` | `all` | aarch64 subset: `all`, `off`, or comma-separated ISAs (see below) |
+| `layers` | `default` | layer allowlist: `default`, `all`, or comma-separated names |
 
 `x86_isa` accepts `avx`, `avx2`, `fma`, `fma4`, `xop`, `f16c`, `avxvnni`,
 `avxvnniint8`, `avxneconvert`, `avx512`, `avx512vnni`, `avx512bf16`.
@@ -103,6 +104,27 @@ between the selected ones at runtime.
 (`-Darm_isa=off` disables dispatch). The `bf16` storage feature defaults to
 `true`, so an aarch64 subset must include `bf16` unless `.bf16 = false` is set
 — including `arm_isa = "off"`.
+
+`layers` trims what gets compiled. `default` keeps upstream's selection,
+`all` enables every known layer (including `ArgMax` and `SPP`, which upstream
+leaves off), and a comma-separated list compiles exactly those layers.
+
+```zig
+const ncnn_dep = b.dependency("ncnn_zig", .{
+    .target = target,
+    .optimize = optimize,
+    .layers = "Input,Convolution,ReLU,Pooling,Softmax",
+});
+```
+
+Filtering never renumbers `layer_type_enum.h`, so existing `.param` files stay
+compatible; omitted layers have no creator, and loading a model that uses one
+fails at param load. Link-time dependencies are pulled in automatically:
+`Convolution` enables `Gemm` because `convolution_x86.cpp` calls GEMM's int8
+kernels. `Mat` helpers create layers internally (`Packing`, `Flatten`,
+`Padding`, `Crop`, `Interp`, `Cast`, `Bias`, `Scale`), so keep those if the
+wrapper's Mat and pixel utilities are used. `zig build test` needs `Input`,
+`ReLU`, `Packing`, `Flatten`, `Padding`, `Cast`, `Bias` and `Scale`.
 
 ```zig
 const ncnn_dep = b.dependency("ncnn_zig", .{

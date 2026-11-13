@@ -51,7 +51,7 @@ pub fn build(b: *std.Build) !void {
     // LLVM cannot emit SEH unwind info for the GNU asm blocks in the arm
     // kernels on aarch64-windows.
     const gnu_inline_asm = options.gnu_inline_asm and !(t.os.tag == .windows and t.cpu.arch.isAarch64());
-    const layers = try resolveLayers(b, upstream, arch);
+    const layers = try resolveLayers(b, upstream, arch, options.layers);
 
     // ncnn's base sources must be built for the architecture baseline. Its
     // `#if __AVX__` style blocks belong to separately generated ISA variants,
@@ -486,13 +486,15 @@ fn resolveLayers(
     b: *std.Build,
     upstream: *std.Build.Dependency,
     arch: ?[]const u8,
+    spec: []const u8,
 ) ![]generate.ResolvedLayer {
+    const enabled = try resolveLayerSelection(b.allocator, spec);
     const list = try b.allocator.alloc(generate.ResolvedLayer, sources.layers.len);
     const io = b.graph.io;
 
     for (sources.layers, 0..) |layer, i| {
-        list[i] = .{ .name = layer.name, .enabled = layer.enabled };
-        if (!layer.enabled) continue;
+        list[i] = .{ .name = layer.name, .enabled = enabled[i] };
+        if (!enabled[i]) continue;
         const a = arch orelse continue;
 
         const lower = try std.ascii.allocLowerString(b.allocator, layer.name);
@@ -502,6 +504,56 @@ fn resolveLayers(
     }
 
     return list;
+}
+
+/// Maps the `layers` option to one flag per table entry. Indices must keep
+/// following the table order: they are baked into `layer_type_enum.h`.
+fn resolveLayerSelection(allocator: std.mem.Allocator, spec: []const u8) ![]bool {
+    const enabled = try allocator.alloc(bool, sources.layers.len);
+
+    if (std.mem.eql(u8, spec, "default")) {
+        for (sources.layers, enabled) |layer, *flag| flag.* = layer.enabled;
+    } else if (std.mem.eql(u8, spec, "all")) {
+        @memset(enabled, true);
+    } else {
+        @memset(enabled, false);
+        var it = std.mem.splitScalar(u8, spec, ',');
+        while (it.next()) |raw| {
+            const name = std.mem.trim(u8, raw, " \t");
+            if (name.len == 0) fail("layers: empty entry in '{s}'", .{spec});
+            const index = findLayer(name) orelse fail("layers: unknown layer '{s}'", .{name});
+            enabled[index] = true;
+        }
+    }
+
+    // Pull in translation units that provide symbols referenced by enabled
+    // layers; a static archive cannot resolve them on its own.
+    var changed = true;
+    while (changed) {
+        changed = false;
+        for (sources.dependencies) |dep| {
+            const index = findLayer(dep.layer) orelse
+                fail("layers: unknown dependency '{s}'", .{dep.layer});
+            if (!enabled[index]) continue;
+            for (dep.needs) |name| {
+                const need = findLayer(name) orelse
+                    fail("layers: unknown dependency '{s}'", .{name});
+                if (!enabled[need]) {
+                    enabled[need] = true;
+                    changed = true;
+                }
+            }
+        }
+    }
+
+    return enabled;
+}
+
+fn findLayer(name: []const u8) ?usize {
+    for (sources.layers, 0..) |layer, i| {
+        if (std.mem.eql(u8, layer.name, name)) return i;
+    }
+    return null;
 }
 
 /// Reads a file from the pinned upstream package.

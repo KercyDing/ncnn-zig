@@ -85,6 +85,9 @@ jobs:
       - name: AArch64 subset
         run: zig build bindings -Dtarget=aarch64-linux-gnu -Darm_isa=asimdhp,asimddp -Dbf16=false
 
+      - name: Layer subset
+        run: zig build test -Dx86_isa=off -Dlayers=Input,ReLU,Convolution,Packing,Flatten,Padding,Cast,Bias,Scale
+
       - name: Reject invalid subsets
         shell: bash
         run: |
@@ -92,6 +95,7 @@ jobs:
           ! zig build bindings -Dx86_isa=all,avx2
           ! zig build bindings -Dtarget=aarch64-linux-gnu -Darm_isa=asimddp
           ! zig build bindings -Dtarget=aarch64-linux-gnu -Druntime_x86=false
+          ! zig build bindings -Dlayers=Input,NoSuchLayer
 
   test:
     name: Build and test (${{ matrix.platform }})

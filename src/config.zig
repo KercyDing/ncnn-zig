@@ -85,6 +85,10 @@ pub const Options = struct {
     /// aarch64 dispatch subset: `all`, `off`, or comma-separated `ArmIsa` names.
     arm_isa: []const u8 = "all",
 
+    /// Layer allowlist: `default` (upstream defaults), `all`, or a
+    /// comma-separated list of layer class names.
+    layers: []const u8 = "default",
+
     gnu_inline_asm: bool = true,
 
     disable_rtti: bool = false,
@@ -102,6 +106,7 @@ pub const Options = struct {
         }
         o.x86_isa = b.option([]const u8, "x86_isa", "x86 dispatch subset: all, off, or comma-separated ISAs") orelse o.x86_isa;
         o.arm_isa = b.option([]const u8, "arm_isa", "arm64 dispatch subset: all, off, or comma-separated ISAs") orelse o.arm_isa;
+        o.layers = b.option([]const u8, "layers", "layer allowlist: default, all, or comma-separated names") orelse o.layers;
         return o;
     }
 };

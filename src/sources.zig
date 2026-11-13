@@ -132,6 +132,14 @@ pub const layers = [_]Layer{
     .{ .name = "RotaryEmbed" },
 };
 
+/// Link-time dependencies between layer translation units. Enabling `layer`
+/// also enables every entry in `needs`.
+pub const dependencies = [_]struct { layer: []const u8, needs: []const []const u8 }{
+    // `convolution_x86.cpp` calls the int8 GEMM utilities defined in
+    // `gemm_x86.cpp`; without the Gemm TU the final link fails.
+    .{ .layer = "Convolution", .needs = &.{"Gemm"} },
+};
+
 /// Always compiled, relative to the upstream `src` directory.
 pub const core = [_][]const u8{
     "allocator.cpp",
