@@ -84,7 +84,7 @@ as `-D<name>`.
 | `int8`, `weight_quant`, `bf16` | `true` | quantized paths |
 | `force_inline` | `true` | force-inline hot helpers |
 | `benchmark`, `coverage` | `false` | upstream debug switches |
-| `openmp` | `true` | parallel loops via ncnn's simpleomp runtime (POSIX) |
+| `openmp` | `true` | parallel loops via ncnn's simpleomp runtime (POSIX, windows-gnu; requires `threads`) |
 | `simpleocv`, `simplestl`, `simplemath` | `false` | minimal stubs |
 | `winxp` | `false` | Windows XP compatibility |
 | `disable_rtti`, `disable_exception` | `false` | build without RTTI/exceptions |
@@ -156,8 +156,10 @@ The same values are accepted on the command line, e.g.
   which is a git submodule and not part of the upstream release tarball used
   here. `-Dvulkan=true` is rejected at configure time.
 - Parallel loops use ncnn's simpleomp runtime, so no external OpenMP library
-  is needed and `Option.setNumThreads` takes effect. simpleomp is POSIX-only;
-  Windows builds run the loops serially.
+  is needed and `Option.setNumThreads` takes effect. On windows-gnu the
+  runtime's single `pthread_once` call is generated as a native
+  `InitOnceExecuteOnce`, so Windows GNU builds are parallel without
+  winpthreads; the MSVC ABI still runs the loops serially.
 
 Verified:
 
@@ -166,7 +168,8 @@ Verified:
   `arm-linux-gnueabihf`.
 - `zig build test`: version match, options, `Input -> ReLU`, custom layer,
   data reader loading, pooled allocators, Mat layout/reshape/packing,
-  ParamDict round trip, pixel round trip, drawing.
+  ParamDict round trip, pixel round trip, drawing, and a check that simpleomp
+  dispatches to multiple OS threads when more than one core is available.
 - `zig build test-upstream`: six upstream layer tests against this library.
 
 Everything else in the wrapper is unverified.

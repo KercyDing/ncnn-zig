@@ -46,8 +46,14 @@ pub fn build(b: *std.Build) !void {
     else
         std.EnumSet(config.ArmIsa).empty;
     if (arm64) validateArmIsa(arm_isa, options.bf16);
-    // simpleomp uses pthread_once, so it is POSIX only.
-    const openmp = options.openmp and t.os.tag != .windows;
+    if (options.openmp and !options.threads)
+        fail("openmp requires threads=true", .{});
+    // simpleomp only needs pthread_once. Zig's mingw provides the primitive,
+    // but upstream platform.h does not include pthread.h on Windows, so the
+    // runtime source is patched for windows-gnu instead of pulling in
+    // winpthreads.
+    const windows_gnu = t.os.tag == .windows and t.abi == .gnu;
+    const openmp = options.openmp and (t.os.tag != .windows or windows_gnu);
     // LLVM cannot emit SEH unwind info for the GNU asm blocks in the arm
     // kernels on aarch64-windows.
     const gnu_inline_asm = options.gnu_inline_asm and !(t.os.tag == .windows and t.cpu.arch.isAarch64());
@@ -210,7 +216,11 @@ pub fn build(b: *std.Build) !void {
     var files: std.ArrayList([]const u8) = .empty;
     defer files.deinit(b.allocator);
 
-    for (sources.core) |file| try files.append(b.allocator, b.fmt("src/{s}", .{file}));
+    for (sources.core) |file| {
+        // Windows builds use the patched copy added below.
+        if (windows_gnu and openmp and std.mem.eql(u8, file, "simpleomp.cpp")) continue;
+        try files.append(b.allocator, b.fmt("src/{s}", .{file}));
+    }
     if (t.abi.isAndroid()) {
         for (sources.android) |file| try files.append(b.allocator, b.fmt("src/{s}", .{file}));
     }
@@ -228,6 +238,14 @@ pub fn build(b: *std.Build) !void {
         .files = files.items,
         .flags = flags.items,
     });
+
+    if (windows_gnu and openmp) {
+        mod.addCSourceFiles(.{
+            .root = b.path("cpp"),
+            .files = &.{"simpleomp_win32.cpp"},
+            .flags = flags.items,
+        });
+    }
 
     if (x86_isa.count() != 0) {
         if (avx_sources.items.len != 0) {
@@ -433,6 +451,29 @@ pub fn build(b: *std.Build) !void {
     const tests = b.addTest(.{ .root_module = test_mod });
     const run_tests = b.addRunArtifact(tests);
     test_step.dependOn(&run_tests.step);
+
+    // Correct results alone also hold for a serial fallback, so check that
+    // the runtime really dispatches the loop to multiple OS threads.
+    if (openmp) {
+        const simpleomp_mod = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        });
+        simpleomp_mod.addCSourceFiles(.{
+            .root = b.path("test"),
+            .files = &.{"simpleomp.c"},
+            .flags = &.{"-fopenmp"},
+        });
+        if (t.os.tag != .windows) simpleomp_mod.linkSystemLibrary("pthread", .{});
+        simpleomp_mod.linkLibrary(lib);
+        const simpleomp_test = b.addExecutable(.{
+            .name = "test_simpleomp",
+            .root_module = simpleomp_mod,
+        });
+        const run_simpleomp = b.addRunArtifact(simpleomp_test);
+        test_step.dependOn(&run_simpleomp.step);
+    }
 
     // Upstream's own layer tests compare the dispatched kernels against the
     // naive reference implementation, so they exercise the registry, the
