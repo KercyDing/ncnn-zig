@@ -21,7 +21,7 @@ but `-Dprebuilt=<dir>` can consume one.
 Add the dependency:
 
 ```bash
-zig fetch --save git+https://github.com/kercyding/ncnn-zig#v0.2.0
+zig fetch --save git+https://github.com/kercyding/ncnn-zig#v0.3.0
 ```
 
 Link the static library and import the Zig module:
