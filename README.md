@@ -34,6 +34,32 @@ exe.root_module.linkLibrary(ncnn_dep.artifact("ncnn"));
 ncnn is always linked statically, producing a single self-contained binary.
 Shared-library builds are not supported.
 
+### Trim layers from a model
+
+`-Dlayers` accepts a comma-separated allowlist. Generate a suggestion from a
+`.param` file:
+
+```bash
+python3 tools/layers.py model.param
+```
+
+It prints a `.layers = "..."` line and notes about fused activations, custom
+layers and the default helper set. The suggestion targets a runnable build,
+not a minimal one: remove helper layers you do not need and test the model.
+ncnn-zig still expands static dependencies such as `Convolution -> Gemm`
+automatically.
+
+```zig
+const ncnn_dep = b.dependency("ncnn_zig", .{
+    .target = target,
+    .optimize = optimize,
+    .layers = "Input,Convolution,ReLU,Pooling,Softmax",
+});
+```
+
+For a strictly minimal list, use `--minimal` as the starting point and add the
+layers your code needs (pixel/Mat helpers, custom layers).
+
 The package also exports a Zig module named `ncnn`:
 
 ```zig

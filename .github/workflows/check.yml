@@ -83,6 +83,9 @@ jobs:
       - name: Runtime layer dependencies
         run: zig build check-deps
 
+      - name: Layer suggestion
+        run: python3 tools/layers.py examples/ppocrv6/src/models/PP_OCRv6_tiny_rec.param
+
       - name: AVX2 subset
         run: zig build test-upstream -Dx86_isa=avx,avx2
 
