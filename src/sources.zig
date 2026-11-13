@@ -132,12 +132,24 @@ pub const layers = [_]Layer{
     .{ .name = "RotaryEmbed" },
 };
 
-/// Link-time dependencies between layer translation units. Enabling `layer`
+/// Layers that must be compiled together. Covers link-time symbol references
+/// and layers created at runtime through `create_layer()`. Enabling `layer`
 /// also enables every entry in `needs`.
 pub const dependencies = [_]struct { layer: []const u8, needs: []const []const u8 }{
     // `convolution_x86.cpp` calls the int8 GEMM utilities defined in
-    // `gemm_x86.cpp`; without the Gemm TU the final link fails.
-    .{ .layer = "Convolution", .needs = &.{"Gemm"} },
+    // `gemm_x86.cpp`; without the Gemm TU the final link fails. The generic
+    // 1x1 path also creates an InnerProduct layer at runtime.
+    .{ .layer = "Convolution", .needs = &.{ "Gemm", "InnerProduct" } },
+    .{ .layer = "ConvolutionDepthWise", .needs = &.{"Convolution"} },
+    .{ .layer = "Deconvolution", .needs = &.{"Gemm"} },
+    .{ .layer = "DeconvolutionDepthWise", .needs = &.{"Deconvolution"} },
+    .{ .layer = "DeformableConv2D", .needs = &.{"Gemm"} },
+    .{ .layer = "InnerProduct", .needs = &.{"Flatten"} },
+    .{ .layer = "MatMul", .needs = &.{"Gemm"} },
+    .{ .layer = "MultiHeadAttention", .needs = &.{ "Gemm", "Softmax" } },
+    .{ .layer = "SDPA", .needs = &.{ "Gemm", "Softmax" } },
+    .{ .layer = "YoloDetectionOutput", .needs = &.{"Softmax"} },
+    .{ .layer = "Yolov3DetectionOutput", .needs = &.{"Softmax"} },
 };
 
 /// Always compiled, relative to the upstream `src` directory.
